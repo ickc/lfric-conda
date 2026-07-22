@@ -1,0 +1,34 @@
+# Variant configuration for local and CI builds.
+#
+# conda-forge supplies these globally to its feedstocks. Building standalone we
+# have to state them ourselves. Keeping them HERE rather than inlining values in
+# the recipes means each recipe stays byte-identical to what gets submitted
+# upstream -- the recipe never has to be rewritten to migrate.
+
+# --- C standard library (backs the recipes' `stdlib('c')`) ------------------
+# sysroot 2.17 is conda-forge's baseline for linux and the most portable choice:
+# compiled against glibc 2.17, runs on anything newer. Isambard 3 is glibc 2.38.
+c_stdlib:
+  - sysroot
+c_stdlib_version:
+  - "2.17"
+
+# --- Compiler ---------------------------------------------------------------
+# Pinned to 14.3 to match BOTH the Spack environment's gcc@14.3.0 and the
+# compiler conda-forge currently builds its aarch64 Fortran stack with
+# (netcdf-fortran run-requires libgfortran5 >=14.3.0). Fortran .mod files are
+# only readable by the compiler generation that wrote them, so this pin is load
+# bearing -- see docs/proposal.md.
+c_compiler_version:
+  - "14"
+cxx_compiler_version:
+  - "14"
+fortran_compiler_version:
+  - "14"
+
+# --- MPI --------------------------------------------------------------------
+# MVP-1 targets mpich only, matching envs/lfric-env-mvp1.yaml. Adding openmpi
+# here produces the second variant set for the MPI-dependent packages (yaxt,
+# xios); conda-forge would additionally build a `nompi` variant where meaningful.
+mpi:
+  - mpich
