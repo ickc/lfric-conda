@@ -17,7 +17,10 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Only cancel superseded PR runs. On main every commit's packages matter, and
+  # XIOS alone takes several minutes -- cancelling there means a pushed commit
+  # never gets built at all if another lands while it is running.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
