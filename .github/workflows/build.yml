@@ -30,8 +30,11 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck --version
-          bash -n scripts/*.sh
-          shellcheck scripts/*.sh
+          # Recipe build/test scripts are shipped and executed too, so lint them
+          # alongside scripts/ rather than only checking the drivers.
+          scripts_to_check=(scripts/*.sh recipes/*/build.sh recipes/*/*test*.sh)
+          bash -n "${scripts_to_check[@]}"
+          shellcheck "${scripts_to_check[@]}"
 
   build:
     name: build (${{ matrix.target }})

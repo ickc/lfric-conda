@@ -23,6 +23,11 @@ export FI_PROVIDER="${FI_PROVIDER:-tcp}"
 
 # openmpi refuses to oversubscribe by default and will not run as root without
 # an rsh agent override.
+#
+# `mpi` is injected into the build environment by rattler-build from the `mpi`
+# key in variants/conda_build_config.yaml, so it is set despite never being
+# assigned in this file.
+# shellcheck disable=SC2154
 if [[ "${mpi}" == "openmpi" ]]; then
   export MPI_LAUNCH="${PREFIX}/bin/mpirun --oversubscribe"
   export OMPI_MCA_plm_rsh_agent=""
