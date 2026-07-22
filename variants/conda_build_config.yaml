@@ -6,12 +6,17 @@
 # upstream -- the recipe never has to be rewritten to migrate.
 
 # --- C standard library (backs the recipes' `stdlib('c')`) ------------------
-# sysroot 2.17 is conda-forge's baseline for linux and the most portable choice:
-# compiled against glibc 2.17, runs on anything newer. Isambard 3 is glibc 2.38.
+# The sysroot sets the OLDEST glibc a built binary will run against, so lower is
+# more portable. 2.17 is conda-forge's historical baseline but is too old HERE:
+# conda-forge's own libfabric (pulled in by mpich) references getrandom@GLIBC_2.25,
+# so linking anything against MPI under a 2.17 sysroot fails with
+#   libfabric.so.1: undefined reference to `getrandom@GLIBC_2.25'
+# 2.28 is the lowest that satisfies it. Isambard 3 runs glibc 2.38, so this is
+# comfortably below the deployment target.
 c_stdlib:
   - sysroot
 c_stdlib_version:
-  - "2.17"
+  - "2.28"
 
 # --- Compiler ---------------------------------------------------------------
 # Pinned to 14.3 to match BOTH the Spack environment's gcc@14.3.0 and the
