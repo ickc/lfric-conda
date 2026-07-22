@@ -27,7 +27,7 @@ source:
     - patches/0001-cmake-policy-version.patch
 
 build:
-  number: 0
+  number: 1
   script: build.sh
 
 requirements:
@@ -38,6 +38,12 @@ requirements:
     - ninja
     # Upstream generates some array headers with a python script at configure time.
     - python
+  # Blitz++ installs a shared libblitz.so, so anything built against it needs it
+  # at RUN time too, not just at build time. Without this, xios built fine and
+  # then failed with "libblitz.so.0 => not found". Upstream is frozen at 1.0.2,
+  # so an x.x bound is ample.
+  run_exports:
+    - ${{ pin_subpackage('blitzpp', upper_bound='x.x') }}
 
 tests:
   - package_contents:
