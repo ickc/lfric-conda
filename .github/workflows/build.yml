@@ -1,0 +1,67 @@
+# Build every recipe on every target architecture.
+#
+# The jobs deliberately call the SAME scripts/ entry points used locally
+# (scripts/build-all.sh), rather than a bespoke CI-only build path -- so a green
+# CI run means the local workflow works, and debugging locally reproduces CI.
+#
+# linux-aarch64 is the primary target (Isambard 3 is Cray EX / Grace), and
+# GitHub's arm64 runners are free for public repositories, so it is built
+# natively rather than emulated.
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          shellcheck --version
+          bash -n scripts/*.sh
+          shellcheck scripts/*.sh
+
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: rattler
+          create-args: rattler-build
+          condarc: |
+            channels:
+              - conda-forge
+
+      - name: Build all recipes
+        shell: bash -el {0}
+        run: bash scripts/build-all.sh
+
+      - name: List local channel
+        shell: bash -el {0}
+        run: bash scripts/list-channel.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: local-channel/**/*.conda
+          if-no-files-found: error
