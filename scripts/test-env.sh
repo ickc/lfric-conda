@@ -72,4 +72,48 @@ info "Compiling and running the smoke test"
   echo COMPILE_OK
   mpiexec -n 2 ./smoke 2>/dev/null
 "
+
+# --- LFRic-specific artefacts ----------------------------------------------
+# The libraries and Fortran modules lfric_core links (-lxios -lyaxt -lyaxt_c)
+# and the tools its build system shells out to.
+cat > "$work/use_mods.f90" <<'EOF'
+program use_mods
+  use xios
+  use yaxt
+  implicit none
+end program use_mods
+EOF
+
+info "Checking LFRic libraries, modules and tools"
+# Single-quoted on purpose: $CONDA_PREFIX must expand inside the activated env.
+# shellcheck disable=SC2016
+"$MAMBA_EXE" run -n "$ENV_NAME" bash -c '
+  set -e
+  fail=0
+  for f in lib/libxios.a include/xios.mod \
+           lib/libyaxt.so lib/libyaxt_c.so include/yaxt.mod \
+           lib/libblitz.so; do
+    if [ -e "$CONDA_PREFIX/$f" ]; then
+      printf "  %-22s present\n" "$f"
+    else
+      printf "  %-22s MISSING\n" "$f"; fail=1
+    fi
+  done
+  for t in rose_picker psyclone fab; do
+    printf "  %-22s %s\n" "$t" "$(command -v $t || echo MISSING)"
+    command -v "$t" >/dev/null || fail=1
+  done
+  exit $fail
+'
+
+# Compiling `use xios` / `use yaxt` proves the shipped .mod files are readable
+# by THIS environment'"'"'s gfortran. gfortran can only read modules written by its
+# own generation, so this is the check that the whole stack agrees on a compiler
+# -- the risk flagged in docs/proposal.md. -fsyntax-only keeps it link-free.
+"$MAMBA_EXE" run -n "$ENV_NAME" bash -c "
+  set -e
+  cd '$work'
+  mpif90 -fsyntax-only -I\"\$CONDA_PREFIX/include\" use_mods.f90
+  echo MODULES_OK
+"
 echo "TEST_ENV_OK"

@@ -28,40 +28,76 @@ the compilers too, not just the runtime libraries.
 
 ## Status
 
-Early. See [`docs/proposal.md`](docs/proposal.md) for the full survey of what
-Stage 1 contains, what conda-forge already provides, and what has to be packaged.
+See [`docs/proposal.md`](docs/proposal.md) for the full survey of what Stage 1
+contains, what conda-forge already provides, and what has to be packaged.
 
 The short version: **conda-forge already has almost everything** — including
 `psyclone`, `fparser`, `sci-fab`, `metomi-rose`, `cylc-flow`, `cylc-rose`, the
 gfortran 14.3 toolchain, and `mpi_mpich_*` builds of `hdf5`/`libnetcdf`/
-`netcdf-fortran`. The gap is:
+`netcdf-fortran`. The gap, and where it stands:
 
 | package | status |
 |---|---|
-| `xios` | to package — the hard one (FCM / `make_xios`) |
-| `blitzpp` | to package (XIOS dep; the name `blitz` is taken by Blitz.js) |
-| `rose-picker` | to package (trivial, `noarch: python`) |
-| `yaxt` | exists on conda-forge, needs a `linux-aarch64` build |
-| `shumlib` | to package (Stage 2 / apps tier) |
+| `xios` | ✅ packaged — the hard one (FCM / `make_xios`) |
+| `blitzpp` | ✅ packaged (XIOS dep; the name `blitz` is taken by Blitz.js) |
+| `rose-picker` | ✅ packaged (`noarch: python`) |
+| `yaxt` | ✅ packaged as an interim mirror; upstream needs a `linux-aarch64` build |
+| `shumlib` | to package (apps tier) |
 | `pfunit`, `gftl`, `gftl-shared`, `fargparse` | to package (unit tests only) |
 
-Recipes are developed here and upstreamed to conda-forge one at a time.
+All four build in CI on `linux-64` and `linux-aarch64`. Nothing has been
+upstreamed to conda-forge yet — see [Upstreaming](#upstreaming).
 
 ## MVP-1
 
 Build `lfric_core` from a `conda activate`d environment on `linux-aarch64`, with
 MPI from conda-forge.
 
-[`envs/lfric-env-mvp1.yaml`](envs/lfric-env-mvp1.yaml) is the base: every Stage-1
-dependency conda-forge *already* has. It has been solved and built on Isambard 3
-(Cray EX, Grace/aarch64), and a program doing `use mpi` + `use netcdf` compiles
-and runs against it. The four gap packages above are what stand between that and
-a working `lfric_core` build.
+[`envs/lfric-env-mvp1.yaml`](envs/lfric-env-mvp1.yaml) is that environment.
+Because the four packages above are not on conda-forge yet, it currently needs
+the local channel:
 
 ```console
-$ micromamba create -n lfric-mvp1 -f envs/lfric-env-mvp1.yaml
-$ micromamba activate lfric-mvp1
+$ bash scripts/build-all.sh                 # populates ./local-channel
+$ bash scripts/test-env.sh                  # creates the env and checks it
 ```
+
+`scripts/test-env.sh` is the integration check. On Isambard 3 (Cray EX,
+Grace/aarch64) it currently reports:
+
+```
+GNU Fortran (conda-forge gcc 14.3.0-19) 14.3.0
+COMPILE_OK
+ MPI ranks      :            2
+ netCDF version : 4.10.0
+  lib/libxios.a          present     include/xios.mod    present
+  lib/libyaxt.so         present     include/yaxt.mod    present
+  rose_picker / psyclone / fab       on PATH
+MODULES_OK
+TEST_ENV_OK
+```
+
+`MODULES_OK` is the one worth calling out: it compiles `use xios` + `use yaxt`
+with the environment's *own* gfortran. gfortran can only read module files
+written by its own generation, so that check is what proves the whole stack —
+conda-forge's Fortran packages and the ones built here — agrees on one compiler.
+
+## Upstreaming
+
+Recipes are developed here and upstreamed to conda-forge one at a time, easiest
+first, so the process is learned on cheap PRs:
+
+1. `rose-picker` — trivial `noarch: python`
+2. `yaxt` — **not a new recipe**: the feedstock exists and its recipe has no
+   aarch64 skip, it just never enabled the platform in `conda-forge.yml`. A
+   one-line `provider: {linux_aarch64: azure}` migration PR. That it builds here
+   on aarch64 is the evidence nothing else is in the way.
+3. `blitzpp`
+4. `gftl`, `gftl-shared`, `fargparse`, `pfunit`
+5. `shumlib` — approach ACCESS-NRI first, who already maintain a recipe
+6. `xios` — last; hardest; may stay in-house longest
+
+The local channel means none of this blocks development.
 
 ## Licence
 
