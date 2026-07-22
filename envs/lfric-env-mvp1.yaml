@@ -1,0 +1,39 @@
+# MVP-1 base: everything the LFRic core environment needs that conda-forge
+# ALREADY has. The four gaps (xios, blitzpp, rose-picker, yaxt/aarch64) are
+# commented out at the bottom -- this file is the "does the rest solve?" probe.
+name: lfric-env-mvp1
+channels:
+  - conda-forge
+dependencies:
+  # --- toolchain (pinned to match the Spack env's gcc@14.3.0) ---------------
+  - gcc_linux-aarch64 14.3.*
+  - gxx_linux-aarch64 14.3.*
+  - gfortran_linux-aarch64 14.3.*
+  # --- MPI + parallel I/O ---------------------------------------------------
+  - mpich
+  - hdf5 * mpi_mpich_*
+  - libnetcdf * mpi_mpich_*
+  - netcdf-fortran * mpi_mpich_*
+  # --- build tooling --------------------------------------------------------
+  - make
+  - cmake
+  - pkg-config
+  - python 3.12.*
+  # --- LFRic build-time python ---------------------------------------------
+  - psyclone 3.3.1
+  - fparser
+  - sci-fab
+  - jinja2
+  - pyyaml
+  - sympy
+  # --- workflow tooling -----------------------------------------------------
+  - metomi-rose
+  - cylc-flow
+  - cylc-rose
+  - ansimarkup
+  - colorama
+  # --- STILL TO PACKAGE (the gap) ------------------------------------------
+  # - xios 2.2701          # new recipe, hard
+  # - blitzpp              # new recipe, easy (XIOS dep; name `blitz` is taken)
+  # - rose-picker          # new recipe, trivial
+  # - yaxt * mpi_mpich_*   # exists on conda-forge, needs a linux-aarch64 build

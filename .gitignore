@@ -1,0 +1,17 @@
+# rattler-build / conda-build output
+output/
+build_artifacts/
+local-channel/
+
+# pixi
+.pixi/
+
+# conda/micromamba envs created in-tree
+envs/*/
+!envs/*.yaml
+
+# editors / OS
+*.swp
+.DS_Store
+__pycache__/
+*.py[cod]
