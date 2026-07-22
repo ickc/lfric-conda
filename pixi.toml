@@ -1,0 +1,23 @@
+# pixi is OPTIONAL here, exactly as in ickc/lfric-env-isambard: every task below
+# is a thin wrapper around a script in scripts/, so anyone without pixi can run
+# the same thing directly. Keep that 1:1 mapping, and keep the docs no-pixi-first.
+#
+# pixi's job is only to provide the build tooling (rattler-build) reproducibly.
+[workspace]
+name = "lfric-conda"
+description = "Conda packages for the LFRic Stage-1 environment"
+channels = ["conda-forge"]
+platforms = ["linux-aarch64", "linux-64", "osx-arm64"]
+
+[dependencies]
+rattler-build = ">=0.70"
+
+[tasks]
+# Build one recipe into the local channel: pixi run build <name>
+build = "bash scripts/build-recipe.sh"
+# Build every recipe, in dependency order.
+build-all = "bash scripts/build-all.sh"
+# Create the MVP-1 environment from envs/ + the local channel and smoke-test it.
+test-env = "bash scripts/test-env.sh"
+# Show what the local channel currently holds.
+channel = "bash scripts/list-channel.sh"
