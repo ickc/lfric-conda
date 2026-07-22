@@ -42,14 +42,28 @@ configure_args=(
 )
 
 # Whether MPI programs can be launched at all is a property of the SANDBOX, not
-# of the recipe: it works on a normal host and on GitHub's arm64 runners, but is
-# flaky on their x86 ones even with the settings above. Rather than keep guessing
-# at launcher settings, probe once and adapt -- so the outcome is deterministic
-# per environment and says which path it took.
+# of the recipe: it works on a normal host and on GitHub's arm64 runners, but not
+# on their x86 ones even with the settings above. Rather than keep guessing at
+# launcher settings, probe once and adapt -- so the outcome is deterministic per
+# environment and says which path it took.
 #
+# The probe must COMPILE AND RUN a real MPI program, because that is what yaxt's
+# configure does. Launching `true` is not enough: it never calls MPI_Init, so it
+# succeeds on runners where MPI itself cannot initialise, and configure then
+# fails anyway with "unable to find a working MPI launch program".
+cat > _mpi_probe.c <<'PROBE'
+#include <mpi.h>
+int main(int argc, char **argv) {
+    MPI_Init(&argc, &argv);
+    MPI_Finalize();
+    return 0;
+}
+PROBE
+
 # MPI_LAUNCH may carry arguments (openmpi adds --oversubscribe), so it must split.
 # shellcheck disable=SC2086
-if ${MPI_LAUNCH} -n 1 true >/dev/null 2>&1; then
+if mpicc -o _mpi_probe _mpi_probe.c >/dev/null 2>&1 \
+   && ${MPI_LAUNCH} -n 2 ./_mpi_probe >/dev/null 2>&1; then
   echo "INFO: MPI launcher works -- keeping yaxt's MPI-defect probes"
 else
   echo "WARNING: cannot launch MPI programs in this sandbox (${MPI_LAUNCH})."
@@ -59,6 +73,7 @@ else
   echo "WARNING: mpich/openmpi, which are known-good implementations."
   configure_args+=(--without-regard-for-quality)
 fi
+rm -f _mpi_probe _mpi_probe.c
 
 # configure hides the actual failure in config.log; surface it rather than
 # leaving a bare 'error: unable to ...' with no context.
