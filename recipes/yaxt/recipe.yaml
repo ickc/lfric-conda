@@ -1,0 +1,80 @@
+# YAXT -- Yet Another eXchange Tool (DKRZ). LFRic links it as `-lyaxt -lyaxt_c`
+# (lfric_core/infrastructure/build/import.mk) for its halo exchanges.
+#
+# UNLIKE the other recipes here, yaxt ALREADY EXISTS on conda-forge
+# (conda-forge/yaxt-feedstock). It is simply not built for linux-aarch64: the
+# recipe has no aarch64 skip, the feedstock's conda-forge.yml just never enabled
+# the platform. The real fix upstream is a one-line migration PR adding
+#
+#   provider:
+#     linux_aarch64: azure
+#
+# and re-rendering -- not a new recipe.
+#
+# This file exists so MVP-1 is not blocked on that PR's review latency. It is a
+# deliberate, near-verbatim translation of the upstream v0 recipe into the v1
+# format (same version, same sha256, same build string scheme, same run_exports),
+# so it can be dropped the moment upstream builds aarch64, with no behaviour
+# change for anything that depended on it.
+schema_version: 1
+
+context:
+  version: "0.11.5.1"
+
+package:
+  name: yaxt
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.dkrz.de/dkrz-sw/yaxt/-/archive/v${{ version }}/yaxt-v${{ version }}.tar.gz
+  sha256: 0bc97acd6cfd8e893318e59daa57e9063cf79644311fc71cdd00597cb89bcc29
+
+build:
+  number: 0
+  # Build string carries the MPI flavour so dependents can require it
+  # explicitly: `yaxt * mpi_mpich_*`, `yaxt * mpi_openmpi_*`, or `yaxt * mpi_*`.
+  string: mpi_${{ mpi }}_${{ hash }}_${{ build_number }}
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('fortran') }}
+    - ${{ stdlib('c') }}
+    - autoconf
+    - automake
+    - libtool
+    - make
+    - pkg-config
+  host:
+    - libgomp
+    - ${{ mpi }}
+  run:
+    - ${{ mpi }}
+  run_exports:
+    - ${{ pin_subpackage('yaxt', upper_bound='x.x') }}
+    - yaxt * mpi_${{ mpi }}_*
+
+tests:
+  - package_contents:
+      lib:
+        - yaxt
+        - yaxt_c
+      include:
+        - yaxt.h
+        - yaxt.mod
+
+about:
+  homepage: https://gitlab.dkrz.de/dkrz-sw/yaxt
+  repository: https://gitlab.dkrz.de/dkrz-sw/yaxt
+  documentation: https://dkrz-sw.gitlab-pages.dkrz.de/yaxt/index.html
+  summary: Yet Another eXchange Tool (yaxt) for coupling of Earth system model components
+  description: |
+    Yet Another eXchange Tool (yaxt) is a lightweight library for coupling Earth
+    system model components, providing automated data redistribution in
+    distributed-memory applications.
+  license: BSD-3-Clause
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - ickc
