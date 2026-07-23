@@ -24,6 +24,21 @@ export LOCAL_CHANNEL="${LFRIC_CONDA_CHANNEL:-$REPO_ROOT/local-channel}"
 export RECIPE_DIR="$REPO_ROOT/recipes"
 export VARIANT_CONFIG="$REPO_ROOT/variants/conda_build_config.yaml"
 
+# --- Per-OS variant overlay ------------------------------------------------
+# Platform-specific pins (C/C++ compiler generation + the C standard library)
+# differ between linux (GNU gcc + glibc sysroot) and macOS (clang + macOS
+# deployment target). rattler-build does NOT honour "# [osx]" selectors inside a
+# variant file, but it DOES merge multiple --variant-config files, so we keep the
+# common keys in VARIANT_CONFIG and select the right overlay here by the BUILD
+# host -- which is the native target both in CI (one runner per platform) and
+# locally. See docs/platform-coverage.md.
+case "$(uname -s)" in
+  Linux)  VARIANT_CONFIG_OS="$REPO_ROOT/variants/linux.yaml" ;;
+  Darwin) VARIANT_CONFIG_OS="$REPO_ROOT/variants/osx.yaml" ;;
+  *)      VARIANT_CONFIG_OS="" ;;
+esac
+export VARIANT_CONFIG_OS
+
 # --- Build order -----------------------------------------------------------
 # Dependency order, so build-all.sh can just walk the list. Leaf packages first.
 # Keep this list authoritative: it is the project's roadmap in execution order.

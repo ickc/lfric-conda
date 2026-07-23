@@ -1,0 +1,117 @@
+# Reusable workflow: build ONE recipe across every target platform.
+#
+# Called once per package from build.yml, which wires the dependency DAG with
+# `needs:`. Splitting it out this way gives per-(package x platform) status
+# checks and independent re-runs -- a fix to one package rebuilds only it (and
+# its dependents), not the whole set -- while keeping the platform matrix and the
+# build steps defined in exactly one place.
+#
+# Dependencies flow through artifacts: each package uploads its built channel as
+# `chan-<package>-<target>`, and a dependent package restores its deps'
+# channels (same run) into per-dep directories that scripts/build-recipe.sh adds
+# as read-only input channels (LFRIC_DEP_CHANNELS). Keeping each dep in its own
+# directory keeps their repodata.json files from colliding.
+name: build-pkg
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: recipe name under recipes/
+        required: true
+        type: string
+      deps:
+        description: space-separated build dependencies satisfied from our channel
+        required: false
+        type: string
+        default: ""
+
+# gh run download (used to restore dependency artifacts within the same run)
+# needs read access to the run's artifacts.
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    name: ${{ inputs.package }} (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    # Cap runaway/hung builds (macOS xios is the slowest). Note this bounds RUN
+    # time, not queue time -- a retired runner label (e.g. the old macos-13) would
+    # still sit queued forever, which is why the label must be a live one.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+          # macos-13 (Intel) was retired by GitHub in Dec 2025 and queues forever;
+          # macos-15-intel is the last x86_64 image (until Aug 2027). If it turns
+          # out not to be free for this repo it fast-fails (billing) rather than
+          # sticking, and `if: !cancelled()` on dependents keeps the other
+          # platforms flowing. See docs/platform-coverage.md.
+          - os: macos-15-intel
+            target: osx-64
+          - os: macos-14
+            target: osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: rattler
+          create-args: rattler-build
+          condarc: |
+            channels:
+              - conda-forge
+
+      - name: Restore dependency channels
+        if: ${{ inputs.deps != '' }}
+        shell: bash -el {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p channels
+          for dep in ${{ inputs.deps }}; do
+            name="chan-${dep}-${{ matrix.target }}"
+            echo "::group::restore ${name}"
+            gh run download "${{ github.run_id }}" -n "${name}" -D "channels/${dep}"
+            find "channels/${dep}" -name '*.conda' -o -name '*.tar.bz2' | sort
+            echo "::endgroup::"
+          done
+
+      - name: Build ${{ inputs.package }}
+        shell: bash -el {0}
+        env:
+          # Output goes to a fresh dir so the uploaded artifact is ONLY this
+          # package (its deps live under channels/ and are read-only inputs).
+          LFRIC_CONDA_CHANNEL: ${{ github.workspace }}/out
+        run: |
+          set -euo pipefail
+          # Point rattler-build at each restored dependency channel. Derive each
+          # channel root from its repodata.json's grandparent, so this is robust
+          # to however upload-artifact nested the tree.
+          chans=""
+          if [ -d channels ]; then
+            while IFS= read -r rj; do
+              root="$(cd "$(dirname "$rj")/.." && pwd)"
+              chans="$chans $root"
+            done < <(find channels -name repodata.json 2>/dev/null | sort -u)
+          fi
+          export LFRIC_DEP_CHANNELS="$(printf '%s\n' $chans | sort -u | tr '\n' ' ')"
+          echo "LFRIC_DEP_CHANNELS=$LFRIC_DEP_CHANNELS"
+          bash scripts/build-recipe.sh "${{ inputs.package }}"
+
+      - name: Show built package
+        shell: bash -el {0}
+        run: find out -name '*.conda' -o -name '*.tar.bz2' | sort
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chan-${{ inputs.package }}-${{ matrix.target }}
+          path: out/**
+          if-no-files-found: error

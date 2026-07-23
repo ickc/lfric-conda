@@ -45,8 +45,12 @@ gfortran 14.3 toolchain, and `mpi_mpich_*` builds of `hdf5`/`libnetcdf`/
 | `shumlib` | ✅ packaged (apps tier — `lfric_apps` links `-lshum`) |
 | `gftl`, `gftl-shared`, `fargparse`, `pfunit` | ✅ packaged (unit-test tier; versioned-subdir CMake installs) |
 
-**All nine build green in CI on `linux-64` and `linux-aarch64`.** Nothing has
-been upstreamed to conda-forge yet — see [Upstreaming](#upstreaming).
+**All nine build green in CI on `linux-64`, `linux-aarch64`, `osx-arm64`, and
+`osx-64`** (Apple Silicon + Intel Mac). See
+[`docs/platform-coverage.md`](docs/platform-coverage.md) for the per-package
+support policy, the clang-vs-GNU decision, the macOS runner details, and why
+Windows is out of scope. Nothing has been upstreamed to conda-forge yet — see
+[Upstreaming](#upstreaming).
 
 **Stage 2 works:** the apps-tier science target `lfric_atm` compiles and links
 entirely against the conda environment — see

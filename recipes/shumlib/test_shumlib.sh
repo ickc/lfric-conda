@@ -14,12 +14,17 @@ ${FC} -fsyntax-only ${FFLAGS} -I"$PREFIX/include" test_shumlib.f90
 echo SHUMLIB_MODULES_OK
 
 # libshum must resolve its own runtime dependencies (this is exactly the check
-# that caught xios's missing libblitz.so).
-lib="$PREFIX/lib/libshum.so"
+# that caught xios's missing libblitz.so). The shared library is .so on linux and
+# .dylib on macOS; the ldd "not found" gate runs where ldd exists (linux) and is
+# skipped on macOS (which has no ldd).
+case "$(uname -s)" in
+  Darwin) lib="$PREFIX/lib/libshum.dylib" ;;
+  *)      lib="$PREFIX/lib/libshum.so" ;;
+esac
 test -f "$lib"
 if command -v ldd >/dev/null 2>&1; then
   if ldd "$lib" | grep -i "not found"; then
-    echo "ERROR: unresolved runtime dependencies in libshum.so"
+    echo "ERROR: unresolved runtime dependencies in $lib"
     exit 1
   fi
 fi

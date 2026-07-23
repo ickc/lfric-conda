@@ -34,9 +34,25 @@ args=(
   --recipe "$recipe"
   --output-dir "$LOCAL_CHANNEL"
   -c "file://$LOCAL_CHANNEL"
-  -c conda-forge
 )
+
+# Extra read-only dependency channels. The local build-all flow leaves this empty
+# and lets everything accumulate in LOCAL_CHANNEL; CI's per-package jobs instead
+# restore each upstream package's channel from an artifact and point here (one
+# dir per dep), so a package builds against exactly its declared dependencies.
+# LFRIC_DEP_CHANNELS is a space-separated list of channel directories.
+if [ -n "${LFRIC_DEP_CHANNELS:-}" ]; then
+  for ch in $LFRIC_DEP_CHANNELS; do
+    args+=(-c "file://$ch")
+  done
+fi
+
+args+=(-c conda-forge)
+
+# Base (common) variant config, then the per-OS overlay on top -- rattler-build
+# merges them (variants/{linux,osx}.yaml carry the platform-specific pins).
 [ -f "$VARIANT_CONFIG" ] && args+=(--variant-config "$VARIANT_CONFIG")
+[ -n "${VARIANT_CONFIG_OS:-}" ] && [ -f "$VARIANT_CONFIG_OS" ] && args+=(--variant-config "$VARIANT_CONFIG_OS")
 
 info "Building '$name' -> $LOCAL_CHANNEL"
 rattler-build build "${args[@]}" "$@"

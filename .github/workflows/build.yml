@@ -1,12 +1,15 @@
-# Build every recipe on every target architecture.
+# Build every recipe on every target platform.
 #
-# The jobs deliberately call the SAME scripts/ entry points used locally
-# (scripts/build-all.sh), rather than a bespoke CI-only build path -- so a green
-# CI run means the local workflow works, and debugging locally reproduces CI.
+# Structure: one reusable workflow (build-pkg.yml) builds a single recipe across
+# the whole platform matrix; this file calls it once per package and wires the
+# build-dependency DAG with `needs:`. The result is a per-(package x platform)
+# grid of status checks that fail and re-run independently -- so iterating on,
+# say, xios on osx-arm64 does not rebuild the packages that already pass.
 #
-# linux-aarch64 is the primary target (Isambard 3 is Cray EX / Grace), and
-# GitHub's arm64 runners are free for public repositories, so it is built
-# natively rather than emulated.
+# Platforms: linux-64, linux-aarch64 (primary -- Isambard 3 is Cray EX / Grace),
+# and osx-64 + osx-arm64 (developer tier -- see docs/platform-coverage.md).
+# Windows is deliberately out of scope (no conda-forge mpich; the underlying HPC
+# codes have no Windows build) -- also documented there.
 name: build
 
 on:
@@ -17,10 +20,14 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Only cancel superseded PR runs. On main every commit's packages matter, and
-  # XIOS alone takes several minutes -- cancelling there means a pushed commit
-  # never gets built at all if another lands while it is running.
+  # Only cancel superseded PR runs. On main every commit's packages matter.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Passed through to the reusable workflow; `gh run download` needs actions:read
+# to restore dependency artifacts within the same run.
+permissions:
+  contents: read
+  actions: read
 
 jobs:
   lint:
@@ -36,38 +43,64 @@ jobs:
           bash -n "${scripts_to_check[@]}"
           shellcheck "${scripts_to_check[@]}"
 
-  build:
-    name: build (${{ matrix.target }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: linux-64
-          - os: ubuntu-24.04-arm
-            target: linux-aarch64
-    steps:
-      - uses: actions/checkout@v4
+  # --- roots (no dependency on another package in our channel) ---------------
+  rose-picker:
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: rose-picker
 
-      - uses: mamba-org/setup-micromamba@v2
-        with:
-          environment-name: rattler
-          create-args: rattler-build
-          condarc: |
-            channels:
-              - conda-forge
+  blitzpp:
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: blitzpp
 
-      - name: Build all recipes
-        shell: bash -el {0}
-        run: bash scripts/build-all.sh
+  yaxt:
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: yaxt
 
-      - name: List local channel
-        shell: bash -el {0}
-        run: bash scripts/list-channel.sh
+  shumlib:
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: shumlib
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: packages-${{ matrix.target }}
-          path: local-channel/**/*.conda
-          if-no-files-found: error
+  gftl:
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: gftl
+
+  # --- dependents (build against our own channel) ---------------------------
+  # `if: !cancelled()` so that a dependency failing on ONE platform does not skip
+  # the whole dependent job -- only the matching platform cell fails (when it
+  # cannot restore that platform's dependency artifact).
+  xios:
+    needs: [blitzpp]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: xios
+      deps: blitzpp
+
+  gftl-shared:
+    needs: [gftl]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: gftl-shared
+      deps: gftl
+
+  fargparse:
+    needs: [gftl, gftl-shared]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: fargparse
+      deps: gftl gftl-shared
+
+  pfunit:
+    needs: [gftl, gftl-shared, fargparse]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/build-pkg.yml
+    with:
+      package: pfunit
+      deps: gftl gftl-shared fargparse

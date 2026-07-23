@@ -31,6 +31,16 @@ OASIS_LIBDIR=""
 OASIS_LIB=""
 EOF
 
+# The LINKER is mpif90 (gfortran), which does not auto-link the C++ runtime that
+# XIOS's C++ objects and blitz need, so the arch file adds it explicitly. Which
+# runtime depends on the platform's C++ toolchain: GNU libstdc++ on linux, LLVM
+# libc++ on macOS (conda-forge's osx C/C++ compiler is clang). Forcing -lstdc++
+# on osx would fail -- there is no libstdc++ in the clang toolchain there.
+case "${target_platform:-$(uname -s)}" in
+  osx-*|Darwin) CXX_RT_LIB="-lc++" ;;
+  *)            CXX_RT_LIB="-lstdc++" ;;
+esac
+
 # Boost and Blitz++ headers are both under $PREFIX/include, so one -I covers the
 # two -I flags the Spack recipe emits separately.
 #
@@ -54,7 +64,7 @@ cat > "arch/arch-${ARCH}.fcm" <<EOF
 %DEBUG_FFLAGS   -g
 
 %BASE_INC       -D__NONE__
-%BASE_LD        -L${PREFIX}/lib -lblitz -lstdc++
+%BASE_LD        -L${PREFIX}/lib -lblitz ${CXX_RT_LIB}
 
 %CPP            mpicc -E
 %FPP            mpicc -E -P -x c
