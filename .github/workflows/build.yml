@@ -37,11 +37,46 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck --version
-          # Recipe build/test scripts are shipped and executed too, so lint them
+          # Recipe build/test scripts, the LFRic-source patches and the Stage-2
+          # example scripts are all shipped and executed too, so lint them
           # alongside scripts/ rather than only checking the drivers.
-          scripts_to_check=(scripts/*.sh recipes/*/build.sh recipes/*/*test*.sh)
+          scripts_to_check=(
+            scripts/*.sh
+            recipes/*/build.sh recipes/*/*test*.sh
+            patches/*.sh
+            examples/*/*.sh
+            examples/science-suites/site/*.sh
+            examples/science-suites/site/bin/launch-exe
+          )
           bash -n "${scripts_to_check[@]}"
           shellcheck "${scripts_to_check[@]}"
+
+      - name: cylc lint the science suites
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: cylc
+          create-args: cylc-flow cylc-rose metomi-rose
+          condarc: |
+            channels:
+              - conda-forge
+      - name: cylc validate
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          # Cheap structural check of the ported suites: every flow.cylc must parse
+          # and validate with the template variables run-suite.sh injects. The
+          # end-to-end run happens in the stage2 jobs; this catches a broken suite
+          # in seconds instead of an hour in.
+          for suite in examples/science-suites/u-*; do
+            echo "::group::cylc validate $suite"
+            cylc validate "$suite" \
+              -S "REPO_ROOT='$PWD'" \
+              -S "LFRIC_CONDA_ENV='$CONDA_PREFIX'" \
+              -S "ACTIVATE_ENV='$PWD/examples/science-suites/site/activate-env.sh'" \
+              -S "CYLC_PLATFORM='localhost'" \
+              -S "CORES_PER_NODE=4"
+            echo "::endgroup::"
+          done
 
   # --- roots (no dependency on another package in our channel) ---------------
   rose-picker:
@@ -104,3 +139,27 @@ jobs:
     with:
       package: pfunit
       deps: gftl gftl-shared fargparse
+
+  # --- Stage 2: use the environment ----------------------------------------
+  # Everything above builds the ENVIRONMENT. These two jobs are the point of it:
+  # they assemble envs/lfric-env.yaml from the artifacts above plus conda-forge,
+  # and then do real LFRic work with it -- compile the science target, and run a
+  # real Rose/Cylc science suite end to end (extract -> build -> mesh -> run).
+  # They are what makes "the conda environment is a drop-in for the Spack one" a
+  # tested claim rather than an assertion. See .github/workflows/stage2.yml.
+  #
+  # They depend on every package the environment resolves from our channel, so
+  # they run only once the whole Stage-1 grid is green for their platform.
+  stage2-compile:
+    needs: [rose-picker, blitzpp, yaxt, xios, shumlib, gftl, gftl-shared, fargparse, pfunit]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/stage2.yml
+    with:
+      example: minimal-compile
+
+  stage2-suite:
+    needs: [rose-picker, blitzpp, yaxt, xios, shumlib, gftl, gftl-shared, fargparse, pfunit]
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/stage2.yml
+    with:
+      example: science-suite
