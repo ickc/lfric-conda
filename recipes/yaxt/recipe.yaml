@@ -47,8 +47,16 @@ requirements:
     - make
     - pkg-config
   host:
-    - libgomp
     - ${{ mpi }}
+    # OpenMP runtime: GNU libgomp on linux, LLVM libomp on macOS. libgomp is a
+    # linux-only conda-forge package (osx uses llvm-openmp), so an unconditional
+    # `libgomp` fails to resolve on osx. Matches the upstream yaxt-feedstock
+    # selector (- libgomp # [linux] / - llvm-openmp # [osx]).
+    - if: linux
+      then:
+        - libgomp
+      else:
+        - llvm-openmp
   run:
     - ${{ mpi }}
   run_exports:
