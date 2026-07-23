@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2317,SC2329  # helper funcs (info/warn/fail) are a
+# uniform set copied verbatim from the Spack repo's patch stack; some are
+# unused or reached only indirectly in a given patch. Kept identical on
+# purpose -- see patches/README.md.
 # Target tree: vendor/lfric_apps (staged by scripts/stage-sources.sh) -- LFRic Apps 2026.07.1 / vn3.2.
 #
 # Fix an upstream 2026.07.1 regression that breaks any "dynamics + external
@@ -38,11 +42,8 @@ REPO_ROOT="${PIXI_PROJECT_ROOT:-$(cd "$_here/.." && pwd)}"
 # science-suites' offline extract sets LFRIC_SRC_ROOT to a per-suite extracted tree
 # so the same patch applies there.
 WORKING_DIR="${LFRIC_SRC_ROOT:-$REPO_ROOT/vendor}"
-# shellcheck disable=SC2329  # helper set kept uniform across the patch stack
 info() { echo "INFO: $*"; }
-# shellcheck disable=SC2329  # helper set kept uniform across the patch stack
 warn() { echo "WARN: $*" >&2; }
-# shellcheck disable=SC2329  # helper set kept uniform across the patch stack
 fail() { echo "ERROR: $*" >&2; }
 
 patch_slow_physics_mphys_field() {
