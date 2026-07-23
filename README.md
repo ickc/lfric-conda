@@ -41,12 +41,16 @@ gfortran 14.3 toolchain, and `mpi_mpich_*` builds of `hdf5`/`libnetcdf`/
 | `xios` | ✅ packaged — the hard one (FCM / `make_xios`) |
 | `blitzpp` | ✅ packaged (XIOS dep; the name `blitz` is taken by Blitz.js) |
 | `rose-picker` | ✅ packaged (`noarch: python`) |
-| `yaxt` | ✅ packaged as an interim mirror; upstream needs a `linux-aarch64` build |
-| `shumlib` | to package (apps tier) |
-| `pfunit`, `gftl`, `gftl-shared`, `fargparse` | to package (unit tests only) |
+| `yaxt` | ✅ packaged — built `--with-idxtype=long` (64-bit `Xt_int`, required by LFRic); upstream feedstock also needs a `linux-aarch64` build |
+| `shumlib` | ✅ packaged (apps tier — `lfric_apps` links `-lshum`) |
+| `gftl`, `gftl-shared`, `fargparse`, `pfunit` | ✅ packaged (unit-test tier; versioned-subdir CMake installs) |
 
-All four build in CI on `linux-64` and `linux-aarch64`. Nothing has been
-upstreamed to conda-forge yet — see [Upstreaming](#upstreaming).
+**All nine build green in CI on `linux-64` and `linux-aarch64`.** Nothing has
+been upstreamed to conda-forge yet — see [Upstreaming](#upstreaming).
+
+**Stage 2 works:** the apps-tier science target `lfric_atm` compiles and links
+entirely against the conda environment — see
+[`examples/minimal-compile/`](examples/minimal-compile/build.sh).
 
 ## MVP-1
 
@@ -81,6 +85,40 @@ TEST_ENV_OK
 with the environment's *own* gfortran. gfortran can only read module files
 written by its own generation, so that check is what proves the whole stack —
 conda-forge's Fortran packages and the ones built here — agrees on one compiler.
+
+## Compiling LFRic (Stage 2)
+
+[`examples/minimal-compile/build.sh`](examples/minimal-compile/build.sh) compiles
+the apps-tier science target `lfric_atm` against
+[`envs/lfric-env-mvp2.yaml`](envs/lfric-env-mvp2.yaml) (MVP-1 + `shumlib`) — the
+conda analogue of the same example in the Spack repo, and the proof that an end
+user can `conda activate` and build LFRic with no Spack or Lmod:
+
+```console
+$ micromamba create -n lfric-conda-stage2 -f envs/lfric-env-mvp2.yaml \
+    -c ./local-channel -c conda-forge
+$ micromamba run -n lfric-conda-stage2 bash examples/minimal-compile/build.sh
+...
+LFRIC_ATM_OK
+```
+
+It reuses the LFRic *source* vendored in the sibling Spack repo (identical source;
+only the environment differs) and produces a ~98 MB `lfric_atm` binary linking the
+env's `yaxt`/`netcdf`/`mpich`/`hdf5`.
+
+The script also codifies the **`lfric-env` activation contract** — what the future
+`lfric-env` metapackage's `activate.d/` must export, the conda analogue of the
+Spack repo's `scripts/lfric-env.lua`. Two of these are non-obvious and were only
+found by compiling:
+
+- **`FC=mpif90 CXX=mpic++`** — LFRic dispatches its compiler flag files by the
+  *leaf name* of the compiler (`fortran/mpif90.mk`, `cxx/mpic++.mk`), so conda's
+  `aarch64-conda-linux-gnu-*` names do not work.
+- **`MPICH_CXX=<host>-g++`** — `cxx/mpic++.mk` identifies the C++ backend from the
+  first word of `mpic++ --version` and requires it to contain `g++`. conda's
+  `mpic++` wraps the `c++`-named driver, so point it at the identically-configured
+  `g++`-named one (same gcc, ABI-safe). `FC` needs no equivalent because
+  `gfortran --version` always prints "GNU Fortran".
 
 ## Upstreaming
 
