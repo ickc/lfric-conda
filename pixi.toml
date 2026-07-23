@@ -7,7 +7,7 @@
 name = "lfric-conda"
 description = "Conda packages for the LFRic Stage-1 environment"
 channels = ["conda-forge"]
-platforms = ["linux-aarch64", "linux-64", "osx-arm64"]
+platforms = ["linux-aarch64", "linux-64", "osx-arm64", "osx-64"]
 
 [dependencies]
 rattler-build = ">=0.70"
