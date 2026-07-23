@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euxo pipefail
 
+# Belt-and-braces against archive extraction leaving the top-level pFUnit-v<ver>/
+# dir in place: if CMakeLists.txt is not at the source root, descend into it.
+if [ ! -f CMakeLists.txt ]; then
+  d="$(find . -maxdepth 1 -type d -name 'pFUnit-*' | head -1)"
+  [ -n "$d" ] && cd "$d"
+fi
+
 # Options mirror mo-spack-packages' pfunit recipe:
 #  - static libraries (BUILD_SHARED_LIBS=OFF), as the whole Goddard group is built;
 #  - MPI enabled (SKIP_MPI=NO): pFUnit's CMake does find_package(MPI COMPONENTS

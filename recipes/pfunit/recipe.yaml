@@ -18,10 +18,14 @@ package:
   version: ${{ version }}
 
 source:
-  # A GitHub RELEASE asset (a plain .tar), not an archive/refs/tags tarball.
+  # A GitHub RELEASE asset (a plain .tar), not an archive/refs/tags tarball -- this
+  # is the source Spack uses. No `file_name:` here: setting it made rattler-build
+  # treat the download as a plain file and NOT extract it, so the work dir held the
+  # .tar instead of its contents and CMake could not find CMakeLists.txt. Letting
+  # the URL's .tar extension drive extraction strips the single top-level
+  # pFUnit-v<ver>/ dir, exactly as the .tar.gz sources of the other recipes do.
   url: https://github.com/Goddard-Fortran-Ecosystem/pFUnit/releases/download/v${{ version }}/pFUnit-v${{ version }}.tar
   sha256: ec84e2e17d79598d782edc5468e7ebfe392ccf5aff9170a15c10f0b52f9f62b4
-  file_name: pFUnit-v${{ version }}.tar
 
 build:
   number: 0
