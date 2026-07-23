@@ -39,6 +39,12 @@ configure_args=(
   --prefix="${PREFIX}"
   --with-mpi-root="${PREFIX}"
   --with-pic
+  # LFRic declares its global/halo index arrays as integer(i_halo_index), a
+  # 64-bit kind, and passes them to yaxt's xt_idxvec_new(). yaxt's Xt_int must
+  # therefore be 64-bit or the generic has "no specific function" for the call
+  # (lfric_core halo_comms_mod fails to compile). mo-spack-packages builds yaxt
+  # with idxlong=True (--with-idxtype=long) for exactly this reason; match it.
+  --with-idxtype=long
 )
 
 # Whether MPI programs can be launched at all is a property of the SANDBOX, not

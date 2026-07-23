@@ -30,7 +30,8 @@ source:
   sha256: 0bc97acd6cfd8e893318e59daa57e9063cf79644311fc71cdd00597cb89bcc29
 
 build:
-  number: 0
+  # 1: rebuilt --with-idxtype=long so Xt_int is 64-bit (LFRic's i_halo_index).
+  number: 1
   # Build string carries the MPI flavour so dependents can require it
   # explicitly: `yaxt * mpi_mpich_*`, `yaxt * mpi_openmpi_*`, or `yaxt * mpi_*`.
   string: mpi_${{ mpi }}_${{ hash }}_${{ build_number }}
