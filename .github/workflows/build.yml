@@ -69,7 +69,9 @@ jobs:
           # in seconds instead of an hour in.
           for suite in examples/science-suites/u-*; do
             echo "::group::cylc validate $suite"
-            cylc validate "$suite" \
+            # `./` prefix is required: cylc 8.6 treats a bare relative path as a
+            # workflow ID (looked up under ~/cylc-run) rather than a source dir.
+            cylc validate "./$suite" \
               -S "REPO_ROOT='$PWD'" \
               -S "LFRIC_CONDA_ENV='$CONDA_PREFIX'" \
               -S "ACTIVATE_ENV='$PWD/examples/science-suites/site/activate-env.sh'" \
