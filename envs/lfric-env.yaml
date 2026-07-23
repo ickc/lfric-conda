@@ -15,9 +15,18 @@
 #
 # Six packages are not on conda-forge yet and resolve from the local channel --
 # see README.md ("Upstreaming"); they are marked below.
+#
+# NO `channels:` key here on purpose. The channel list must be supplied by the
+# caller, in a deliberate order with the local channel FIRST:
+#   local:  micromamba create -f envs/lfric-env.yaml -c ./local-channel -c conda-forge
+#   CI:     via a strict-priority condarc (see .github/workflows/stage2.yml)
+# If this file listed `conda-forge`, that entry merges AHEAD of the caller's local
+# channel and outranks it even under strict priority -- which silently pulls
+# conda-forge's `yaxt` (built with the default 32-bit Xt_int) over the local
+# `--with-idxtype=long` build LFRic requires, and the compile fails at link with
+# `no specific function for the generic 'xt_idxvec_new'`. Keeping channels out of
+# the file makes the caller's order authoritative.
 name: lfric-env
-channels:
-  - conda-forge
 dependencies:
   # --- toolchain (gcc 14.3, matching the Spack env's gcc@14.3.0) ------------
   - c-compiler 1.11.*

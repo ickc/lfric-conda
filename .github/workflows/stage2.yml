@@ -90,10 +90,17 @@ jobs:
           {
             echo "channel_priority: strict"
             echo "channels:"
+            # One channel root per package. Each channel dir has a repodata.json in
+            # BOTH its <subdir>/ and noarch/, so derive the root and dedup -- else a
+            # channel is listed twice (harmless, but noise).
             while IFS= read -r rj; do
-              root="$(cd "$(dirname "$rj")/.." && pwd)"
+              (cd "$(dirname "$rj")/.." && pwd)
+            done < <(find channels -name repodata.json) | sort -u | while IFS= read -r root; do
               echo "  - file://$root"
-            done < <(find channels -name repodata.json | sort -u)
+            done
+            # conda-forge LAST: with strict priority the local channels above win
+            # for any package they provide (notably yaxt, whose conda-forge build
+            # has the wrong 32-bit Xt_int -- see envs/lfric-env.yaml).
             echo "  - conda-forge"
           } > ci-condarc.yaml
           cat ci-condarc.yaml
@@ -116,6 +123,26 @@ jobs:
             printf '%-16s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
           done
           cylc version; rose version
+
+      # Guard against the channel-priority trap: every package this repo builds
+      # MUST come from a local channel, never conda-forge. conda-forge ships a
+      # `yaxt` that satisfies the spec but is built with the wrong 32-bit Xt_int,
+      # and the failure is a confusing link error deep in the lfric_atm compile
+      # (`no specific function for the generic 'xt_idxvec_new'`). Fail here, clearly,
+      # if any of them leaked in from conda-forge instead.
+      - name: Assert local packages came from the local channel
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          bad=0
+          for p in rose-picker blitzpp yaxt xios shumlib gftl gftl-shared fargparse pfunit; do
+            ch="$(micromamba list -n lfric-env "^${p}$" --json | python -c "import json,sys; r=json.load(sys.stdin); print(r[0]['channel'] if r else 'MISSING')")"
+            printf '%-14s %s\n' "$p" "$ch"
+            case "$ch" in
+              *conda-forge*|MISSING) echo "  ^ ERROR: expected a local channel"; bad=1 ;;
+            esac
+          done
+          [ "$bad" -eq 0 ] || { echo "one or more packages did not resolve from the local channel"; exit 1; }
 
       # --- Stage 2: the LFRic source --------------------------------------
       - name: Stage and patch the LFRic source
