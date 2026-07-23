@@ -36,6 +36,10 @@ jobs:
   build:
     name: ${{ inputs.package }} (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
+    # Cap runaway/hung builds (macOS xios is the slowest). Note this bounds RUN
+    # time, not queue time -- a retired runner label (e.g. the old macos-13) would
+    # still sit queued forever, which is why the label must be a live one.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -44,7 +48,12 @@ jobs:
             target: linux-64
           - os: ubuntu-24.04-arm
             target: linux-aarch64
-          - os: macos-13
+          # macos-13 (Intel) was retired by GitHub in Dec 2025 and queues forever;
+          # macos-15-intel is the last x86_64 image (until Aug 2027). If it turns
+          # out not to be free for this repo it fast-fails (billing) rather than
+          # sticking, and `if: !cancelled()` on dependents keeps the other
+          # platforms flowing. See docs/platform-coverage.md.
+          - os: macos-15-intel
             target: osx-64
           - os: macos-14
             target: osx-arm64
