@@ -28,7 +28,7 @@ source:
   sha256: ec84e2e17d79598d782edc5468e7ebfe392ccf5aff9170a15c10f0b52f9f62b4
 
 build:
-  number: 0
+  number: 1
   # MPI-linked, so it is variant-tagged like xios/yaxt.
   string: mpi_${{ mpi }}_${{ hash }}_${{ build_number }}
 
@@ -41,20 +41,26 @@ requirements:
     - ninja
     - m4
     - python
+  # NOTE: python is deliberately NOT in host. Putting it there makes conda's
+  # python_abi run_export pin the package to the BUILD-TIME python minor version
+  # (`python_abi 3.14.* *_cp314`), which then conflicts with any environment
+  # pinning a different python -- exactly what happened with envs/lfric-env.yaml
+  # (python 3.12): the package became uninstallable. pFUnit's Python use is a
+  # plain script (the .pf preprocessor), with no C extension and no ABI coupling,
+  # so it belongs in build (the tool) and run (the interpreter consumers need).
   host:
     - ${{ mpi }}
     - gftl
     - gftl-shared
     - fargparse
-    - python
   run:
     - ${{ mpi }}
     - gftl
     - gftl-shared
     - fargparse
     # pFUnit's .pf-file preprocessor (funitproc / pFUnitParser) is a Python script
-    # that consumers invoke when building their tests.
-    - python
+    # that consumers invoke when building their tests. Any Python 3 will do.
+    - python >=3.8
 
 tests:
   - script:
