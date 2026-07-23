@@ -1,0 +1,48 @@
+# MVP-2: the LFRic Stage-1 environment for the APPS tier (lfric_atm and the other
+# UM-physics applications), on linux-aarch64, with MPI from conda-forge.
+#
+# It is MVP-1 plus shumlib -- the one extra package lfric_apps links (`-lshum`).
+# The pfunit group (gftl/gftl-shared/fargparse/pfunit) is deliberately absent: it
+# is needed only to build LFRic's unit tests, not any application or science run.
+#
+# Everything but the four packaged libraries (xios, blitzpp, rose-picker, yaxt) and
+# shumlib comes from conda-forge; until those are upstreamed they resolve from the
+# local channel (scripts/test-env.sh and the stage-2 build pass it; see README).
+name: lfric-env-mvp2
+channels:
+  - conda-forge
+dependencies:
+  # --- toolchain (pinned to match the Spack env's gcc@14.3.0) ---------------
+  - gcc_linux-aarch64 14.3.*
+  - gxx_linux-aarch64 14.3.*
+  - gfortran_linux-aarch64 14.3.*
+  # --- MPI + parallel I/O ---------------------------------------------------
+  - mpich
+  - hdf5 * mpi_mpich_*
+  - libnetcdf * mpi_mpich_*
+  - netcdf-fortran * mpi_mpich_*
+  # --- build tooling --------------------------------------------------------
+  - make
+  - cmake
+  - pkg-config
+  - python 3.12.*
+  # --- LFRic build-time python ---------------------------------------------
+  - psyclone 3.3.1
+  - fparser
+  - sci-fab
+  - jinja2
+  - pyyaml
+  - sympy
+  # --- workflow tooling -----------------------------------------------------
+  - metomi-rose
+  - cylc-flow
+  - cylc-rose
+  - ansimarkup
+  - colorama
+  # --- packaged by this project (see recipes/) ------------------------------
+  # Not on conda-forge yet, so these come from the local channel for now.
+  - xios 2.2701 mpi_mpich_*
+  - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
+  - rose-picker            # generates LFRic's Fortran config loaders
+  - yaxt * mpi_mpich_*     # on conda-forge, but not yet built for linux-aarch64
+  - shumlib                # lfric_apps links -lshum (UM physics utilities)
