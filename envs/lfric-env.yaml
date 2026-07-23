@@ -1,0 +1,64 @@
+# lfric-env -- the FULL LFRic Stage-1 environment.
+#
+# This is the conda counterpart of the Spack repo's `lfric-apps-isambard` bundle
+# (spack-repo/lfric-isambard/packages/lfric-apps-isambard/package.py): one spec per
+# direct dependency of that bundle, so `conda activate lfric-env` puts a user in
+# the same place as `module load lfric-env/<version>/<variant>`. The per-package
+# correspondence, and the two deliberate differences, are in
+# docs/stage1-parity.md.
+#
+# Portable across linux-64 and linux-aarch64: the compilers come in through the
+# arch-independent metapackages (c-/cxx-/fortran-compiler pull the right
+# <name>_linux-<arch> ACTIVATION packages, which is what exports FC/GXX/
+# CONDA_TOOLCHAIN_HOST and hence what scripts/lfric-env-activate.sh builds on),
+# pinned to the gcc 14.3 the Spack environment uses.
+#
+# Six packages are not on conda-forge yet and resolve from the local channel --
+# see README.md ("Upstreaming"); they are marked below.
+name: lfric-env
+channels:
+  - conda-forge
+dependencies:
+  # --- toolchain (gcc 14.3, matching the Spack env's gcc@14.3.0) ------------
+  - c-compiler 1.11.*
+  - cxx-compiler 1.11.*
+  - fortran-compiler 1.11.*
+  - gcc 14.3.*
+  - gxx 14.3.*
+  - gfortran 14.3.*
+  # --- MPI + parallel I/O ---------------------------------------------------
+  - mpich
+  - hdf5 * mpi_mpich_*
+  - libnetcdf * mpi_mpich_*
+  - netcdf-fortran * mpi_mpich_*
+  # --- build tooling --------------------------------------------------------
+  - make
+  - cmake
+  - pkg-config
+  - python 3.12.*
+  # --- LFRic build-time python ---------------------------------------------
+  - psyclone 3.3.1
+  - fparser
+  - sci-fab
+  - jinja2
+  - pyyaml
+  - sympy
+  # --- workflow tooling -----------------------------------------------------
+  - metomi-rose
+  - cylc-flow
+  - cylc-rose
+  - ansimarkup
+  - colorama
+  # --- packaged by this project (see recipes/) ------------------------------
+  # Not on conda-forge yet, so these come from the local channel for now.
+  - xios 2.2701 mpi_mpich_*
+  - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
+  - rose-picker            # generates LFRic's Fortran config loaders
+  - yaxt * mpi_mpich_*     # on conda-forge, but not yet built for linux-aarch64
+  - shumlib                # lfric_apps links -lshum (UM physics utilities)
+  # The unit-test tier. Not needed to build or run an application, but the Spack
+  # bundle carries it (pfunit+mpi), so the parity environment does too.
+  - pfunit
+  - gftl
+  - gftl-shared
+  - fargparse
