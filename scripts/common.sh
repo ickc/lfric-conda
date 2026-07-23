@@ -27,7 +27,12 @@ export VARIANT_CONFIG="$REPO_ROOT/variants/conda_build_config.yaml"
 # --- Build order -----------------------------------------------------------
 # Dependency order, so build-all.sh can just walk the list. Leaf packages first.
 # Keep this list authoritative: it is the project's roadmap in execution order.
-export BUILD_ORDER="rose-picker blitzpp yaxt xios"
+#   rose-picker blitzpp yaxt xios   -- MVP-1 (lfric_core applications)
+#   shumlib                         -- lfric_apps tier (lfric_atm links -lshum)
+#   gftl gftl-shared fargparse pfunit -- unit tests only (pfunit needs the gftl trio)
+# build-all.sh skips any entry without a recipe yet, so listing the roadmap here
+# is safe before the recipes exist.
+export BUILD_ORDER="rose-picker blitzpp yaxt xios shumlib gftl gftl-shared fargparse pfunit"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }
