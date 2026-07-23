@@ -1,0 +1,27 @@
+# Linux-only variant overlay. Merged ON TOP of variants/conda_build_config.yaml
+# by scripts/common.sh when `uname -s` == Linux (rattler-build merges multiple
+# --variant-config files). See docs/platform-coverage.md.
+
+# --- C standard library (backs the recipes' `stdlib('c')`) ------------------
+# On linux `stdlib('c')` is the glibc sysroot, whose version sets the OLDEST
+# glibc a built binary will run against -- lower is more portable. 2.17 is
+# conda-forge's baseline but is too old HERE: conda-forge's own libfabric (pulled
+# in by mpich) references getrandom@GLIBC_2.25, so linking anything against MPI
+# under a 2.17 sysroot fails with
+#   libfabric.so.1: undefined reference to `getrandom@GLIBC_2.25'
+# 2.28 is the lowest that satisfies it. Isambard 3 runs glibc 2.38, so this is
+# comfortably below the deployment target.
+c_stdlib:
+  - sysroot
+c_stdlib_version:
+  - "2.28"
+
+# --- C / C++ compiler generation (GNU on linux) -----------------------------
+# gcc/g++ 14, matching BOTH the Spack environment's gcc@14.3.0 and the compiler
+# conda-forge currently builds its linux stack with. (On macOS the C/C++ compiler
+# is clang, pinned separately in variants/osx.yaml; these gcc pins would be wrong
+# there, which is exactly why they are not in the base.)
+c_compiler_version:
+  - "14"
+cxx_compiler_version:
+  - "14"

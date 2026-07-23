@@ -1,39 +1,37 @@
-# Variant configuration for local and CI builds.
+# Variant configuration for local and CI builds -- the COMMON (all-platform) keys.
 #
 # conda-forge supplies these globally to its feedstocks. Building standalone we
-# have to state them ourselves. Keeping them HERE rather than inlining values in
-# the recipes means each recipe stays byte-identical to what gets submitted
-# upstream -- the recipe never has to be rewritten to migrate.
-
-# --- C standard library (backs the recipes' `stdlib('c')`) ------------------
-# The sysroot sets the OLDEST glibc a built binary will run against, so lower is
-# more portable. 2.17 is conda-forge's historical baseline but is too old HERE:
-# conda-forge's own libfabric (pulled in by mpich) references getrandom@GLIBC_2.25,
-# so linking anything against MPI under a 2.17 sysroot fails with
-#   libfabric.so.1: undefined reference to `getrandom@GLIBC_2.25'
-# 2.28 is the lowest that satisfies it. Isambard 3 runs glibc 2.38, so this is
-# comfortably below the deployment target.
-c_stdlib:
-  - sysroot
-c_stdlib_version:
-  - "2.28"
-
-# --- Compiler ---------------------------------------------------------------
-# Pinned to 14.3 to match BOTH the Spack environment's gcc@14.3.0 and the
-# compiler conda-forge currently builds its aarch64 Fortran stack with
-# (netcdf-fortran run-requires libgfortran5 >=14.3.0). Fortran .mod files are
-# only readable by the compiler generation that wrote them, so this pin is load
-# bearing -- see docs/proposal.md.
-c_compiler_version:
-  - "14"
-cxx_compiler_version:
-  - "14"
-fortran_compiler_version:
-  - "14"
+# have to state them ourselves. Keeping them here (not inlined in recipes) means
+# each recipe stays byte-identical to what gets submitted upstream.
+#
+# Platform-specific pins (C/C++ compiler generation, the C standard library) do
+# NOT live here: they differ between linux (GNU gcc + glibc sysroot) and macOS
+# (clang + macOS deployment target). rattler-build does NOT honour conda-build
+# "# [osx]" selectors inside a variant file, but it DOES merge multiple
+# --variant-config files, so those pins live in per-OS overlays that
+# scripts/common.sh selects by `uname` and passes on top of this base:
+#   variants/linux.yaml    variants/osx.yaml
+# See docs/platform-coverage.md for the full rationale.
 
 # --- MPI --------------------------------------------------------------------
-# MVP-1 targets mpich only, matching envs/lfric-env-mvp1.yaml. Adding openmpi
-# here produces the second variant set for the MPI-dependent packages (yaxt,
-# xios); conda-forge would additionally build a `nompi` variant where meaningful.
+# MVP targets mpich only, matching envs/lfric-env-mvp*.yaml. Adding openmpi here
+# would produce the second variant set for the MPI-dependent packages (yaxt,
+# xios, pfunit). mpich exists on linux-64/aarch64 and osx-64/arm64 -- but NOT on
+# Windows (only msmpi, a different API), which is one reason Windows is out of
+# scope (docs/platform-coverage.md).
 mpi:
   - mpich
+
+# --- Fortran compiler generation (common to linux AND osx) ------------------
+# gfortran is the Fortran compiler on BOTH platforms -- there is no production
+# clang-Fortran in conda-forge -- and conda-forge pins fortran_compiler_version
+# to 14 on both linux and osx. So this is genuinely platform-independent and
+# lives in the base.
+#
+# It is load bearing: Fortran .mod files are only readable by the compiler
+# generation that wrote them, so this must match the gfortran conda-forge built
+# its netcdf-fortran / hdf5 / (and our xios / yaxt / shumlib consumers) with. On
+# osx conda-forge's Fortran stack is gfortran 14 too, so the same pin is correct
+# there -- see docs/proposal.md and docs/platform-coverage.md.
+fortran_compiler_version:
+  - "14"

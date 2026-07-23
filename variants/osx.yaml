@@ -1,0 +1,29 @@
+# macOS-only variant overlay. Merged ON TOP of variants/conda_build_config.yaml
+# by scripts/common.sh when `uname -s` == Darwin. Covers osx-arm64 AND osx-64
+# (conda-forge uses one deployment-target baseline for both). See
+# docs/platform-coverage.md for the clang-vs-GNU rationale.
+#
+# On macOS conda-forge's toolchain is MIXED BY FAMILY: clang/clang++ for C/C++
+# (LLVM, libc++), gfortran for Fortran (GCC). We follow that convention so the
+# recipes stay upstreamable and ABI-consistent with the rest of conda-forge osx.
+# The Fortran pin (14) still lives in the base and still matches, because
+# conda-forge builds its osx Fortran stack with gfortran 14 as well -- so the
+# .mod ABI lines up on macOS exactly as it does on linux.
+
+# --- C standard library = the macOS deployment target (NOT a glibc sysroot) --
+# On osx `stdlib('c')` resolves to macosx_deployment_target; 11.0 is conda-forge's
+# current baseline for both osx-arm64 and osx-64 (Big Sur). This is the macOS
+# analogue of the glibc sysroot pin in variants/linux.yaml.
+c_stdlib:
+  - macosx_deployment_target
+c_stdlib_version:
+  - "11.0"
+
+# --- C / C++ compiler generation (clang on osx) -----------------------------
+# conda-forge pins clang/clangxx to 19 on osx. Unlike Fortran, C/C++ carry no
+# .mod ABI constraint, so this only needs to track conda-forge's osx toolchain
+# (so the clang activation packages resolve), not the gcc 14 used on linux.
+c_compiler_version:
+  - "19"
+cxx_compiler_version:
+  - "19"
