@@ -8,17 +8,19 @@ and the repo [`README.md`](../README.md) (per-package status).
 
 | target | tier | who | status |
 |---|---|---|---|
-| `linux-64` | **production** | build farms, CI | supported |
-| `linux-aarch64` | **production** | Isambard 3 (Cray EX / Grace) | supported |
-| `osx-arm64` | **developer** | Apple-Silicon laptops | being brought up (this change) |
-| `osx-64` | developer (best-effort) | Intel Macs (declining) | being brought up (this change) |
+| `linux-64` | **production** | build farms, CI | supported (9/9 green) |
+| `linux-aarch64` | **production** | Isambard 3 (Cray EX / Grace) | supported (9/9 green) |
+| `osx-arm64` | **developer** | Apple-Silicon laptops | **supported (9/9 green)** |
+| `osx-64` | developer (best-effort) | Intel Macs (declining) | **supported (9/9 green), but GitHub drops Intel CI Aug 2027** |
 | `win-64` | — | — | **out of scope** (see below) |
 
-Linux is and stays the production target — every real LFRic run is on Isambard 3.
-macOS is a **developer-convenience** tier: letting someone build and hack on the
-LFRic pieces on a Mac. It is worth doing anyway because **conda-forge upstreaming
-requires each feedstock to build wherever its source does**, so the work is not
-wasted even for packages no one will run a model with on a laptop.
+All nine packages build green on all four platforms in CI (see
+[the CI grid](#ci)). Linux is and stays the production target — every real LFRic
+run is on Isambard 3. macOS is a **developer-convenience** tier: letting someone
+build and hack on the LFRic pieces on a Mac. It is worth doing anyway because
+**conda-forge upstreaming requires each feedstock to build wherever its source
+does**, so the work is not wasted even for packages no one will run a model with
+on a laptop.
 
 There are two distinct goals, and they have different platform reach:
 
@@ -61,29 +63,35 @@ and C/C++ is clang. This is handled by [per-OS variant overlays](#variant-config
 | package | MPI | Fortran `.mod` | macOS upstream policy (evidence) | `osx-arm64` / `osx-64` | `win-64` |
 |---|:--:|:--:|---|:--:|:--:|
 | `rose-picker` | – | – | `noarch: python` — every platform already | ✅ (noarch) | ✅ (noarch) |
-| `blitzpp` | – | – | portable C++ templates; Spack builds it broadly | ✅ expected | ⚠️ possible, no consumer |
-| `gftl` | – | ✓ | NASA Goddard; officially Linux + macOS | ✅ expected | ✗ |
-| `gftl-shared` | – | ✓ | ″ | ✅ expected | ✗ |
-| `fargparse` | – | ✓ | ″ | ✅ expected | ✗ |
-| `pfunit` | ✓ | ✓ | README: *"ported to Linux and Apple OS X"*, gfortran 12+ | ✅ expected | ✗ (no mpich) |
-| `yaxt` | ✓ | ✓ | conda-forge feedstock **already builds `osx-64`** | ✅ expected | ✗ (no mpich) |
-| `xios` | ✓ | ✓ | ships a **`GCC_MACOSX`** arch; "builds with clang+gfortran on OSX" | 🟡 needs an osx arch triplet | ✗ (no mpich) |
-| `shumlib` | – | ✓ | **unknown** — CMake (portable) but ACCESS-NRI ship `linux-64` only | 🟡 probe via CI | ✗ |
+| `blitzpp` | – | – | portable C++ templates; Spack builds it broadly | ✅ green | ⚠️ possible, no consumer |
+| `gftl` | – | ✓ | NASA Goddard; officially Linux + macOS | ✅ green | ✗ |
+| `gftl-shared` | – | ✓ | ″ | ✅ green | ✗ |
+| `fargparse` | – | ✓ | ″ | ✅ green | ✗ |
+| `pfunit` | ✓ | ✓ | README: *"ported to Linux and Apple OS X"*, gfortran 12+ | ✅ green | ✗ (no mpich) |
+| `yaxt` | ✓ | ✓ | conda-forge feedstock **already builds `osx-64`** | ✅ green | ✗ (no mpich) |
+| `xios` | ✓ | ✓ | ships a **`GCC_MACOSX`** arch; "builds with clang+gfortran on OSX" | ✅ green (needed `-lc++`) | ✗ (no mpich) |
+| `shumlib` | – | ✓ | CMake build; no prior macOS precedent, but portable in practice | ✅ green | ✗ |
 
-"expected" = source is known-portable and the infrastructure (mpich,
-mpi-variant hdf5/netcdf, gfortran 14, the noarch python tools) is all present on
-osx; **CI is the gate that turns expected into supported.** The two 🟡 rows are the
-real unknowns:
+All nine build green on osx-64 and osx-arm64 in CI. The infrastructure they need
+(mpich, mpi-variant hdf5/netcdf, gfortran 14, the noarch python tools) is all
+present on osx, and the two rows that looked like real risks resolved cleanly:
 
-- **`xios`** — its FCM build reads hand-written `arch-*` files. Upstream ships a
-  `GCC_MACOSX` arch, so macOS is a known target, but our `arch-CONDA` triplet was
-  written for Linux; osx needs its own (clang C/C++ backend, `.dylib`/`-install_name`
-  linker conventions).
-- **`shumlib`** — no macOS precedent anywhere (even ACCESS-NRI, who maintain a
-  shumlib conda recipe, ship `linux-64` only). CMake helps, but the UM C code may
-  carry Linux-isms. If it does not build, it gets `skip` on osx with a recorded
-  reason rather than a red check — `shumlib` is only needed by the `lfric_apps`
-  tier, not `lfric_core`.
+- **`xios`** — its FCM build reads a hand-written `arch-*` triplet. The only osx
+  change needed was the C++ runtime: the Linux arch links `-lstdc++`, but the osx
+  clang toolchain's C++ runtime is libc++ (`-lc++`). `build.sh` now picks the
+  right one by `target_platform`; everything else (`.dylib` output, the MPI
+  wrappers, the `xios_server.exe`/`libxios.a` names) worked unchanged. This is the
+  concrete payoff of the clang-on-osx decision — a C++-heavy package built with
+  clang, ABI-consistent with conda-forge osx.
+- **`shumlib`** — despite no macOS precedent anywhere (even ACCESS-NRI, who
+  maintain a shumlib conda recipe, ship `linux-64` only), its CMake build was
+  portable as-is; only the test's hardcoded `libshum.so` path needed a `.dylib`
+  branch. Its `.mod` ABI check passed under osx gfortran 14, confirming the
+  Fortran-`.mod` premise holds on macOS.
+
+One further osx-only fix, in `yaxt`: `libgomp` is a linux-only conda-forge
+package, so the OpenMP runtime is selected per-platform (`libgomp` on linux,
+`llvm-openmp` on osx), matching the upstream yaxt-feedstock.
 
 ## macOS: clang vs GNU (the toolchain decision)
 
@@ -164,8 +172,9 @@ linux builds are unchanged.
 ### CI
 
 One reusable workflow, [`build-pkg.yml`](../.github/workflows/build-pkg.yml),
-builds a single recipe across the four-platform matrix
-(`ubuntu-latest`, `ubuntu-24.04-arm`, `macos-13`, `macos-14`). The orchestrator,
+builds a single recipe across the four-platform matrix (`ubuntu-latest` →
+linux-64, `ubuntu-24.04-arm` → linux-aarch64, `macos-14` → osx-arm64,
+`macos-15-intel` → osx-64). The orchestrator,
 [`build.yml`](../.github/workflows/build.yml), calls it once per package and wires
 the build-dependency DAG with `needs:`:
 
@@ -181,6 +190,23 @@ restores its deps' channels (same run, per-dep directories so their
 `LFRIC_DEP_CHANNELS`. The result is a per-(package × platform) grid of checks that
 fail and re-run independently — so iterating on one package/platform does not
 rebuild the ones that already pass.
+
+### macOS runner labels (and a caveat with a shelf life)
+
+The osx-64 runner is **`macos-15-intel`**, not `macos-13`. GitHub **retired the
+macos-13 (Intel) image in December 2025**; a retired label does not error — its
+jobs sit `queued` forever, and because job-level `needs:` waits for *completion*,
+one stuck osx-64 cell silently blocked the entire dependent DAG. `macos-15-intel`
+is the current — and, per GitHub, **the last** — x86_64 macOS image, supported
+until **August 2027**, after which Intel is dropped from Actions entirely. So:
+
+- osx-64 CI is inherently **time-boxed** (gone by Aug 2027). The recipes and
+  variant config support osx-64 identically to osx-arm64 (same clang + gfortran),
+  so after that it can still be built on an Intel Mac or a paid larger runner — it
+  just stops being free-CI-gated. **osx-arm64 is the durable Mac target.**
+- Prefer live runner labels and lean on `if: !cancelled()` for the best-effort
+  legs: a live label that is ever unavailable *fast-fails* (and dependents on the
+  other platforms keep flowing), whereas a retired label hangs.
 
 ## Appendix: verified facts
 
