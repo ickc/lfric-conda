@@ -23,17 +23,20 @@ set -eu
 
 EXEC="${BIN_DIR:?BIN_DIR unset}/${EXEC_NAME:?EXEC_NAME unset}"
 NAMELIST="${EXTRA_NAMELIST_FILES:-configuration.nml}"
-MPIEXEC="${MPIEXEC:-mpiexec}"
+# MPIEXEC may carry arguments (e.g. `mpiexec --oversubscribe`, or `srun`), so read
+# it into an array -- the word-splitting is intentional and this keeps it explicit
+# rather than relying on an unquoted expansion (which shellcheck flags).
+read -r -a MPIEXEC <<< "${MPIEXEC:-mpiexec}"
 
 if [ "${XIOS_SERVER_MODE:-False}" = "True" ]; then
   M="${TOTAL_RANKS:?TOTAL_RANKS unset}"               # model (client) ranks
   S="${XIOS_SERVER_RANKS:?XIOS_SERVER_RANKS unset}"   # dedicated XIOS server ranks
   XIOS_EXEC="$(command -v xios_server.exe)" \
     || { echo "launch-exe: xios_server.exe not on PATH" >&2; exit 1; }
-  echo "launch-exe: $MPIEXEC -n $M $EXEC $NAMELIST : -n $S $XIOS_EXEC"
-  exec $MPIEXEC -n "$M" "$EXEC" "$NAMELIST" : -n "$S" "$XIOS_EXEC"
+  echo "launch-exe: ${MPIEXEC[*]} -n $M $EXEC $NAMELIST : -n $S $XIOS_EXEC"
+  exec "${MPIEXEC[@]}" -n "$M" "$EXEC" "$NAMELIST" : -n "$S" "$XIOS_EXEC"
 else
   N="${TOTAL_RANKS:?TOTAL_RANKS unset}"
-  echo "launch-exe: $MPIEXEC -n $N $EXEC $NAMELIST  (XIOS attached, no dedicated server)"
-  exec $MPIEXEC -n "$N" "$EXEC" "$NAMELIST"
+  echo "launch-exe: ${MPIEXEC[*]} -n $N $EXEC $NAMELIST  (XIOS attached, no dedicated server)"
+  exec "${MPIEXEC[@]}" -n "$N" "$EXEC" "$NAMELIST"
 fi
