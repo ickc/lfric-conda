@@ -37,16 +37,25 @@ _lfric_env_warn() { echo "WARN: lfric-env-activate: $*" >&2; }
 # from inside a sourced script needs the client's shell hook, because
 # `conda activate` is a shell function, not a program.
 _lfric_env_same() {
-  # Same environment? Compare resolved paths when both are paths (CONDA_PREFIX
-  # always is), else fall back to the leaf name for the `-n <name>` form. Getting
-  # this wrong is not cosmetic: a needless re-activation resets conda's own
-  # FFLAGS/LDFLAGS underneath us.
+  # Does the active prefix $1 (CONDA_PREFIX, always a path) already point at the
+  # requested env $2? $2 may be a bare NAME or a PATH, and the distinction matters:
+  #  * a PATH ('/'-containing) must match by RESOLVED path, never by leaf name --
+  #    otherwise a different env with the same leaf (/opt/x/lfric-env vs
+  #    /my/lfric-env) is mistaken for a match and activation is wrongly skipped.
+  #  * a bare NAME can only be compared against $1's leaf.
+  # Getting this wrong is not cosmetic either way: a false "same" runs Stage 2
+  # against the wrong packages; a needless re-activation resets conda's FFLAGS.
   [ -n "${1:-}" ] && [ -n "${2:-}" ] || return 1
   [ "$1" = "$2" ] && return 0
-  if [ -d "$1" ] && [ -d "$2" ]; then
-    [ "$(cd -- "$1" && pwd -P)" = "$(cd -- "$2" && pwd -P)" ] && return 0
-  fi
-  [ "$(basename -- "$1")" = "$(basename -- "$2")" ]
+  case "$2" in
+    */*)
+      [ -d "$1" ] && [ -d "$2" ] || return 1
+      [ "$(cd -- "$1" && pwd -P)" = "$(cd -- "$2" && pwd -P)" ]
+      ;;
+    *)
+      [ "$(basename -- "$1")" = "$2" ]
+      ;;
+  esac
 }
 
 if [ -n "${LFRIC_CONDA_ENV:-}" ] && ! _lfric_env_same "${CONDA_PREFIX:-}" "$LFRIC_CONDA_ENV"; then
@@ -64,10 +73,20 @@ if [ -n "${LFRIC_CONDA_ENV:-}" ] && ! _lfric_env_same "${CONDA_PREFIX:-}" "$LFRI
         break
       fi
     done
-    [ -n "${CONDA_PREFIX:-}" ] || _lfric_env_warn "could not activate '$LFRIC_CONDA_ENV'"
     unset _lfric_act
   fi
   unset _lfric_exe
+
+  # Verify the REQUESTED env is now the active one. When this file is sourced from
+  # a shell that already had a DIFFERENT env active, a FAILED activation leaves the
+  # old CONDA_PREFIX in place -- which would sail past the generic "is anything
+  # active" check below and export compiler/library paths from the wrong prefix,
+  # silently building Stage 2 against unrelated packages. Fail loudly instead.
+  if ! _lfric_env_same "${CONDA_PREFIX:-}" "$LFRIC_CONDA_ENV"; then
+    _lfric_env_warn "could not activate '$LFRIC_CONDA_ENV' (active: ${CONDA_PREFIX:-none})"
+    # shellcheck disable=SC2317  # reached when this file is executed, not sourced
+    return 1 2>/dev/null || exit 1
+  fi
 fi
 
 if [ -z "${CONDA_PREFIX:-}" ]; then
