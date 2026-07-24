@@ -17,7 +17,8 @@
 #   bash scripts/setup-cylc.sh
 #
 # Env:
-#   CYLC_RUN_BASE       run directory  (default $PROJECTDIR|$SCRATCH|$HOME/$USER/cylc-run)
+#   CYLC_RUN_BASE       run directory  (default $CYLC_RUN_BASE_ROOT/$USER/cylc-run)
+#   CYLC_RUN_BASE_ROOT  base for the default run dir (default $PROJECTDIR|$SCRATCH|$HOME)
 #   CYLC_USER_CONF      config file    (default ~/.cylc/flow/global.cylc)
 #   LFRIC_CYLC_SKIP_SETUP=1  do nothing (CI, where the default ~/cylc-run is right)
 set -uo pipefail
