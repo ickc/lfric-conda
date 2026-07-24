@@ -47,6 +47,17 @@ jobs:
     # The lfric_atm compile is the long pole: ~10 min at -j16 on a Grace node, so
     # roughly an hour on 4 vCPUs. Cap well above that, but not at the 6 h default.
     timeout-minutes: 180
+    env:
+      # mpich's UCX transport intermittently fails to initialise on GitHub runners
+      # -- `MPIDI_UCX_init_worker ... Address not valid` -- because it probes a
+      # RoCE/InfiniBand device that is advertised but not actually usable. The
+      # suite runs on ONE node with oversubscribed ranks, so pin UCX to
+      # shared-memory + self: no network-device probing, no flake. (A real
+      # multi-node HPC run leaves this unset so UCX uses the interconnect.)
+      # Set job-wide; it is inherited by the cylc scheduler and its background
+      # tasks, and harmless to the non-MPI compile example.
+      UCX_TLS: sm,self
+      UCX_LOG_LEVEL: error
     strategy:
       fail-fast: false
       matrix:
