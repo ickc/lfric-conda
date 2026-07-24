@@ -17,7 +17,17 @@ rattler-build = ">=0.70"
 build = "bash scripts/build-recipe.sh"
 # Build every recipe, in dependency order.
 build-all = "bash scripts/build-all.sh"
-# Create the MVP-1 environment from envs/ + the local channel and smoke-test it.
+# Create the Stage-1 environment from envs/ + the local channel and smoke-test it.
 test-env = "bash scripts/test-env.sh"
 # Show what the local channel currently holds.
 channel = "bash scripts/list-channel.sh"
+
+# --- Stage 2 -----------------------------------------------------------------
+# Staging the LFRic source needs only git + python3, which are NOT added to this
+# env on purpose: pixi is here to pin rattler-build, and both are already present
+# anywhere this repo can be cloned. The examples themselves run inside the
+# lfric-env environment (`micromamba run -n lfric-env bash examples/...`), not in
+# pixi -- that is the whole point of them.
+stage-sources = "bash scripts/stage-sources.sh"
+patch-all = "bash scripts/patch-all.sh"
+setup-cylc = "bash scripts/setup-cylc.sh"

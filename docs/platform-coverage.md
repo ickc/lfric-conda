@@ -30,6 +30,19 @@ There are two distinct goals, and they have different platform reach:
   link in the chain (XIOS, and the toolchain). Feasible on `osx-arm64` for a
   developer; never on Windows.
 
+### Stage 2 is Linux-only, and that is a separate line
+
+The **Stage-2 examples** — compiling `lfric_atm`, and running the `u-dr932` science
+suite — run in CI on `linux-64` and `linux-aarch64` only
+([`stage2.yml`](../.github/workflows/stage2.yml)). Not because the environment
+fails to build on macOS (it does not — all nine packages are green there), but
+because **LFRic's own build system has no macOS support**: its compiler flag files
+(`fortran/*.mk`, `cxx/*.mk`) cover GNU/Intel/Cray/NVIDIA on Linux, and the physics
+sources it extracts from the UM assume a Linux toolchain. That is an upstream
+property of the science code, not something a packaging repo can or should paper
+over. macOS therefore stays what it is: a tier where you can *build the
+environment*, not one where you run a model.
+
 ## The two hard constraints
 
 Everything below follows from these two facts, both verified against conda-forge's

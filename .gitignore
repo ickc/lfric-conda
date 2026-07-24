@@ -15,3 +15,6 @@ envs/*/
 .DS_Store
 __pycache__/
 *.py[cod]
+
+# Stage-2 LFRic source, staged by scripts/stage-sources.sh
+vendor/
