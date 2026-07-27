@@ -1,0 +1,248 @@
+# Reusable workflow: run ONE Stage-2 example against a freshly assembled Stage-1
+# environment, on every Linux target.
+#
+# Stage 1 is the environment (recipes/, built by build-pkg.yml). Stage 2 is what a
+# scientist does WITH it. This workflow is the proof that the conda environment is
+# a drop-in for the Spack one: it assembles envs/lfric-env.yaml out of conda-forge
+# plus the packages built earlier in the same run, stages the pinned LFRic source,
+# and then runs a real example end to end.
+#
+#   example: minimal-compile   compile the lfric_atm science target
+#   example: science-suite     run the u-dr932 Rose/Cylc suite: extract -> build ->
+#                              mesh -> RUN the model under mpiexec
+#
+# Scale. A GitHub-hosted runner is ONE machine with 4 vCPUs and 16 GB (both
+# ubuntu-latest and ubuntu-24.04-arm), so the suite runs the smallest configuration
+# that is still the same science: C24 mesh, 6 MPI ranks (one per cubed-sphere
+# panel), 6 timesteps. The Isambard 3 run of the same suite uses C48 and 24 ranks
+# on a compute node -- see examples/science-suites/README.md.
+#
+# macOS is out of scope for Stage 2 (Stage 1 still builds there): LFRic is an HPC
+# code with no macOS support in its own build system. See docs/platform-coverage.md.
+name: stage2
+
+on:
+  workflow_call:
+    inputs:
+      example:
+        description: which Stage-2 example to run (minimal-compile | science-suite)
+        required: true
+        type: string
+      deps:
+        description: space-separated packages whose channels to restore
+        required: false
+        type: string
+        default: rose-picker blitzpp yaxt xios shumlib gftl gftl-shared fargparse pfunit
+
+# gh run download (used to restore the package artifacts built in the same run)
+# needs read access to the run's artifacts.
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  run:
+    name: ${{ inputs.example }} (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    # The lfric_atm compile is the long pole: ~10 min at -j16 on a Grace node, so
+    # roughly an hour on 4 vCPUs. Cap well above that, but not at the 6 h default.
+    timeout-minutes: 180
+    env:
+      # mpich's UCX transport intermittently fails to initialise on GitHub runners
+      # -- `MPIDI_UCX_init_worker ... Address not valid` -- because it probes a
+      # RoCE/InfiniBand device that is advertised but not actually usable. The
+      # suite runs on ONE node with oversubscribed ranks, so pin UCX to
+      # shared-memory + self: no network-device probing, no flake. (A real
+      # multi-node HPC run leaves this unset so UCX uses the interconnect.)
+      # Set job-wide; it is inherited by the cylc scheduler and its background
+      # tasks, and harmless to the non-MPI compile example.
+      UCX_TLS: sm,self
+      UCX_LOG_LEVEL: error
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Stage 1: the environment ---------------------------------------
+      - name: Restore package channels
+        shell: bash -e {0}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p channels
+          for dep in ${{ inputs.deps }}; do
+            name="chan-${dep}-${{ matrix.target }}"
+            echo "::group::restore ${name}"
+            gh run download "${{ github.run_id }}" -n "${name}" -D "channels/${dep}"
+            find "channels/${dep}" -name '*.conda' -o -name '*.tar.bz2' | sort
+            echo "::endgroup::"
+          done
+
+      # Each package keeps its OWN channel directory: their repodata.json files
+      # would otherwise collide (the same reason build-pkg.yml does this).
+      #
+      # The channel ORDER matters and is why this is written to a condarc rather
+      # than passed as `-c` flags: with strict priority the first channel holding a
+      # package wins, and `yaxt` exists on conda-forge too -- but conda-forge's is
+      # built with the default 32-bit `Xt_int`, while LFRic needs the
+      # `--with-idxtype=long` build made here. Local channels must therefore come
+      # first, unambiguously.
+      - name: Compose the channel list
+        shell: bash -e {0}
+        run: |
+          set -euo pipefail
+          {
+            echo "channel_priority: strict"
+            echo "channels:"
+            # One channel root per package. Each channel dir has a repodata.json in
+            # BOTH its <subdir>/ and noarch/, so derive the root and dedup -- else a
+            # channel is listed twice (harmless, but noise).
+            while IFS= read -r rj; do
+              (cd "$(dirname "$rj")/.." && pwd)
+            done < <(find channels -name repodata.json) | sort -u | while IFS= read -r root; do
+              echo "  - file://$root"
+            done
+            # conda-forge LAST: with strict priority the local channels above win
+            # for any package they provide (notably yaxt, whose conda-forge build
+            # has the wrong 32-bit Xt_int -- see envs/lfric-env.yaml).
+            echo "  - conda-forge"
+          } > ci-condarc.yaml
+          cat ci-condarc.yaml
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: envs/lfric-env.yaml
+          environment-name: lfric-env
+          condarc-file: ci-condarc.yaml
+
+      - name: Environment summary
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          . scripts/lfric-env-activate.sh
+          echo "prefix : $CONDA_PREFIX"
+          echo "FC=$FC  CXX=$CXX  MPICH_CXX=${MPICH_CXX:-<unset>}"
+          mpif90 --version | head -1
+          for t in mpiexec psyclone rose cylc fab rose_picker xios_server.exe; do
+            printf '%-16s %s\n' "$t" "$(command -v "$t" || echo MISSING)"
+          done
+          cylc version; rose version
+
+      # Guard against the channel-priority trap: every package this repo builds
+      # MUST come from a local channel, never conda-forge. conda-forge ships a
+      # `yaxt` that satisfies the spec but is built with the wrong 32-bit Xt_int,
+      # and the failure is a confusing link error deep in the lfric_atm compile
+      # (`no specific function for the generic 'xt_idxvec_new'`). Fail here, clearly,
+      # if any of them leaked in from conda-forge instead.
+      - name: Assert local packages came from the local channel
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          bad=0
+          for p in rose-picker blitzpp yaxt xios shumlib gftl gftl-shared fargparse pfunit; do
+            ch="$(micromamba list -n lfric-env "^${p}$" --json | python -c "import json,sys; r=json.load(sys.stdin); print(r[0]['channel'] if r else 'MISSING')")"
+            printf '%-14s %s\n' "$p" "$ch"
+            case "$ch" in
+              *conda-forge*|MISSING) echo "  ^ ERROR: expected a local channel"; bad=1 ;;
+            esac
+          done
+          [ "$bad" -eq 0 ] || { echo "one or more packages did not resolve from the local channel"; exit 1; }
+
+      # --- Stage 2: the LFRic source --------------------------------------
+      - name: Stage and patch the LFRic source
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          bash scripts/stage-sources.sh
+          bash scripts/patch-all.sh
+          du -sh vendor
+
+      # --- Stage 2: the example -------------------------------------------
+      - name: Compile lfric_atm (minimal-compile)
+        if: ${{ inputs.example == 'minimal-compile' }}
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          bash examples/minimal-compile/build.sh
+          ls -lh vendor/lfric_apps/applications/lfric_atm/bin/lfric_atm
+
+      - name: Run the u-dr932 science suite
+        if: ${{ inputs.example == 'science-suite' }}
+        shell: bash -el {0}
+        env:
+          # Keep cylc's default ~/cylc-run: the runner's home is the right place,
+          # and the run directory is collected as an artifact below.
+          LFRIC_CYLC_SKIP_SETUP: "1"
+        run: |
+          set -euo pipefail
+          # --no-detach: run the scheduler in the foreground so this step's exit
+          # status IS the workflow's outcome. Without it cylc daemonises and the
+          # step would pass while the suite was still running (or failing).
+          bash examples/science-suites/run-suite.sh u-dr932 --no-detach
+
+      - name: Check the model output
+        if: ${{ inputs.example == 'science-suite' }}
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          run_dir="$HOME/cylc-run/u-dr932/runN"
+          work="$(ls -d "$run_dir"/work/*/lfric_atm | tail -1)"
+          echo "::group::task states"
+          cylc workflow-state u-dr932 || true
+          echo "::endgroup::"
+          ls -lh "$run_dir/share/output/meshes" "$work"
+
+          # Cylc reporting the task succeeded is necessary but NOT sufficient: the
+          # model must have INTEGRATED TO COMPLETION. LFRic writes its own log to
+          # PET<rank>.<program>.Log in the work dir (not to job.out), ending with
+          # `<program> application completed.` -- lfric_core's final log line
+          # (components/driver/source/driver_log_mod.f90).
+          log="$work/PET0.lfric_atm.Log"
+          [ -f "$log" ] || { echo "no model log at $log"; exit 1; }
+          echo "::group::model log (timestepping)"
+          grep -E "timestep|application completed" "$log" | tail -20
+          echo "::endgroup::"
+          grep -q "application completed" "$log" \
+            || { echo "model did not report completion"; tail -80 "$log"; exit 1; }
+          grep -q "End of timestep" "$log" \
+            || { echo "model completed without integrating a timestep"; exit 1; }
+
+          # And XIOS must have written its NetCDF-4/HDF5 output -- that is the part
+          # that exercises xios + netcdf + hdf5 + the file-locking workaround.
+          [ -s "$work/lfric_initial.nc" ] \
+            || { echo "XIOS wrote no output"; ls -la "$work"; exit 1; }
+          echo "LFRIC_ATM_RUN_OK"
+
+      # Copy the logs into the workspace first: upload-artifact does not expand
+      # `~`/`$HOME` in its path globs.
+      - name: Gather logs
+        if: ${{ !cancelled() && inputs.example == 'science-suite' }}
+        shell: bash -e {0}
+        run: |
+          mkdir -p ci-logs
+          cp -rL "$HOME/cylc-run/u-dr932/runN/log" ci-logs/ 2>/dev/null || true
+          # The model's own log lives in the task work dir, not under log/.
+          for d in "$HOME"/cylc-run/u-dr932/runN/work/*/*; do
+            [ -d "$d" ] || continue
+            mkdir -p "ci-logs/model/$(basename "$d")"
+            cp "$d"/*.Log "$d"/*.out "$d"/*.err "$d"/*.nml \
+               "ci-logs/model/$(basename "$d")/" 2>/dev/null || true
+          done
+          find ci-logs -name '*.sqlite3' -delete
+          du -sh ci-logs || true
+
+      - name: Collect logs
+        if: ${{ !cancelled() && inputs.example == 'science-suite' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cylc-logs-u-dr932-${{ matrix.target }}
+          path: ci-logs/**
+          if-no-files-found: warn
+          retention-days: 7

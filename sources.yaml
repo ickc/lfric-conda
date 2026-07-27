@@ -1,0 +1,43 @@
+# sources.yaml -- the LFRic SOURCE pins for the Stage-2 examples.
+#
+# Stage 1 (the conda environment) needs none of this: it is built entirely from
+# recipes/. This file pins the LFRic *science source* that the Stage-2 examples
+# compile -- the conda analogue of the `vendor/` git submodules in the sibling
+# Spack repo (ickc/lfric-env-isambard), which pins the same six repos at the same
+# refs. Keeping the refs identical is what makes the two Stage-2 examples an
+# apples-to-apples comparison: same source, different environment mechanism.
+#
+# `bash scripts/stage-sources.sh` clones each entry into vendor/ (lfric_apps and
+# lfric_core at the top level, the four physics repos under vendor/physics/), and
+# `bash scripts/patch-all.sh` then applies patches/ to those trees.
+#
+# The shape is the upstream-native `dependencies.yaml` shape (source: + ref:), so
+# the same parser reads this file and a suite's own dependencies.yaml. All six
+# repos are PUBLIC and clone anonymously over HTTPS -- no credentials, which is
+# what lets CI stage them.
+#
+# 2026.07.1 == LFRic Apps vn3.2 / Core vn3.2.
+
+lfric_apps:
+    source: https://github.com/MetOffice/lfric_apps.git
+    ref: 2026.07.1   # bd921320 (apps vn3.2)
+
+lfric_core:
+    source: https://github.com/MetOffice/lfric_core.git
+    ref: 2026.07.1   # 5d2a8b11 (core vn3.2)
+
+casim:
+    source: https://github.com/MetOffice/casim.git
+    ref: 2026.07.1   # 396cccfe
+
+jules:
+    source: https://github.com/MetOffice/jules.git
+    ref: 2026.07.1   # b698279d (vn8.2)
+
+socrates:
+    source: https://github.com/MetOffice/socrates.git
+    ref: 2026.07.1   # 3c9f48b8
+
+ukca:
+    source: https://github.com/MetOffice/ukca.git
+    ref: 2026.07.1   # 612131bc

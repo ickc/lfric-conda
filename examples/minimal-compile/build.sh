@@ -3,92 +3,87 @@
 # the conda-provided Stage-1 environment. The conda analogue of
 # examples/minimal-compile/build.sh in ickc/lfric-env-isambard.
 #
-# This is the STAGE-2 proof: it demonstrates that once the environment is provided
-# by conda instead of Spack/Lmod, an end user compiles LFRic exactly the same way.
-# It reuses the LFRic *source* vendored in the sibling Spack repo (identical source;
-# only the environment differs), so nothing here re-stages LFRic.
+# This is the smallest STAGE-2 example: it demonstrates that once the environment
+# is provided by conda instead of Spack/Lmod, an end user compiles LFRic exactly
+# the same way. No science run -- see examples/science-suites/ for that.
 #
-# Usage (env must be created first -- see scripts/test-env.sh / envs/):
-#   micromamba run -n lfric-conda-stage2 bash examples/minimal-compile/build.sh
+# Prerequisites:
+#   1. an environment (envs/lfric-env.yaml -- see README / scripts/test-env.sh)
+#   2. the LFRic source staged and patched:
+#        bash scripts/stage-sources.sh && bash scripts/patch-all.sh
+#
+# Usage:
+#   micromamba run -n lfric-env bash examples/minimal-compile/build.sh
 # or from an activated env:
-#   conda activate lfric-conda-stage2 && bash examples/minimal-compile/build.sh
+#   conda activate lfric-env && bash examples/minimal-compile/build.sh
 #
 # Inputs (all have defaults):
-#   LFRIC_SRC_REPO   sibling Spack repo holding the vendored LFRic source
-#   LFRIC_APPS_ROOT  = $LFRIC_SRC_REPO/vendor/lfric_apps
-#   LFRIC_CORE_ROOT  = $LFRIC_SRC_REPO/vendor/lfric_core
-#   PHYSICS_ROOT     = $LFRIC_SRC_REPO/vendor/physics
-#   WORK_DIR         build working dir (default: a scratch dir outside the source)
-#   MAKE_JOBS        parallel compile jobs (default 16)
+#   LFRIC_VENDOR_DIR   staged source root         (default: $REPO_ROOT/vendor)
+#   LFRIC_APPS_ROOT    = $LFRIC_VENDOR_DIR/lfric_apps
+#   LFRIC_CORE_ROOT    = $LFRIC_VENDOR_DIR/lfric_core
+#   PHYSICS_ROOT       = $LFRIC_VENDOR_DIR/physics
+#   LFRIC_SRC_REPO     use ANOTHER repo's vendored source instead (e.g. the
+#                      sibling Spack repo) -- sets the three above from it
+#   WORK_DIR           build working dir          (default: output/lfric_atm_build)
+#   MAKE_JOBS          parallel compile jobs      (default: nproc, capped at 16)
 set -uo pipefail
 
 info() { echo "INFO: $*"; }
 die()  { echo "ERROR: $*" >&2; exit 1; }
 
-[ -n "${CONDA_PREFIX:-}" ] || die "no CONDA_PREFIX -- activate the env first (micromamba run -n <env> ... / conda activate <env>)"
+_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
+REPO_ROOT="$(cd -- "$_here/../.." && pwd)"
+export REPO_ROOT
 
-# --- The lfric-env contract -------------------------------------------------
-# This block is exactly what the future `lfric-env` conda metapackage's
-# activate.d/ script must export -- the conda analogue of scripts/lfric-env.lua in
-# the Spack repo. `conda activate` alone gives the toolchain, but LFRic needs it
-# spelled a particular way:
-#
-#  * FC/LDMPI/CXX by the LEAF NAME LFRic dispatches its flag files on
-#    (infrastructure/build/fortran/<fc>.mk, cxx/<cxx>.mk): mpif90.mk and mpic++.mk
-#    exist, so FC=mpif90 and CXX=mpic++ -- NOT conda's aarch64-conda-linux-gnu-*
-#    (no such .mk) nor mpich's mpicxx alias (no mpicxx.mk). This is the FC leaf-name
-#    trap flagged in docs/proposal.md, confirmed here.
-#  * FFLAGS/LDFLAGS carrying the env's own include/lib so XIOS/yaxt/netCDF .mod
-#    files and .a/.so resolve. mpif90 already injects $CONDA_PREFIX/{include,lib},
-#    but LFRic's Makefiles read FFLAGS/LDFLAGS directly, so set them explicitly.
-#  * SHUMLIB_ROOT for lfric_apps' -I$SHUMLIB_ROOT/include -L$SHUMLIB_ROOT/lib -lshum
-#    (shumlib installs into $CONDA_PREFIX/{include,lib}).
-#  * FPP + LFRIC_TARGET_PLATFORM, matching the Spack modulefile's defaults.
-# conda's compiler activation has already set CXX to its native C++ driver
-# (aarch64-conda-linux-gnu-c++); capture it before we override CXX below.
-_conda_cxx="${CXX:-}"
-
-export FC=mpif90
-export LDMPI=mpif90
-export CXX=mpic++
-# LFRic's cxx/mpic++.mk identifies the C++ backend from `mpic++ --version`'s first
-# word and requires it to contain "g++". conda's mpic++ wraps the "c++"-named
-# driver (aarch64-conda-linux-gnu-c++), whose --version echoes that program name
-# (no "g++") -- unlike gfortran, which always prints "GNU Fortran", which is why
-# FC=mpif90 needs no such help. Point mpic++ at the identically-configured
-# g++-named driver (same gcc 14.3, so ABI-safe) via MPICH_CXX so the check passes.
-# Derived from conda's own CXX, so it is arch-independent.
-if [ -n "$_conda_cxx" ] && [ "${_conda_cxx%c++}" != "$_conda_cxx" ]; then
-  export MPICH_CXX="${_conda_cxx%c++}g++"
-fi
-export FPP="cpp -traditional-cpp"
-export LFRIC_TARGET_PLATFORM="${LFRIC_TARGET_PLATFORM:-meto-spice}"
-export FFLAGS="-I$CONDA_PREFIX/include ${FFLAGS:-}"
-export LDFLAGS="-L$CONDA_PREFIX/lib -Wl,-rpath=$CONDA_PREFIX/lib ${LDFLAGS:-}"
-export SHUMLIB_ROOT="$CONDA_PREFIX"
+# --- Stage 1: activate the environment --------------------------------------
+# The whole toolchain contract lives in ONE place -- scripts/lfric-env-activate.sh,
+# the conda analogue of the Spack repo's scripts/lfric-env.lua. Sourcing it here is
+# what makes this example a faithful "what an end user does" demonstration: it sets
+# FC/CXX/LDMPI to the leaf names LFRic dispatches its flag files on, puts the
+# environment's include/lib on FFLAGS/LDFLAGS, and points SHUMLIB_ROOT at the
+# prefix. Set LFRIC_CONDA_ENV to have it activate the environment too.
+# shellcheck source=scripts/lfric-env-activate.sh
+. "$REPO_ROOT/scripts/lfric-env-activate.sh" \
+  || die "could not activate the Stage-1 environment"
 
 info "Toolchain: FC=$FC CXX=$CXX -- $($FC --version 2>/dev/null | head -1)"
 
-# --- LFRic source (reused from the sibling Spack repo) ----------------------
-LFRIC_SRC_REPO="${LFRIC_SRC_REPO:-/lfs1i3/scratch/u35v/khcheung.u35v/git/lfric-env-isambard}"
-APPS_ROOT_DIR="${LFRIC_APPS_ROOT:-$LFRIC_SRC_REPO/vendor/lfric_apps}"
-CORE_ROOT_DIR="${LFRIC_CORE_ROOT:-$LFRIC_SRC_REPO/vendor/lfric_core}"
-export PHYSICS_ROOT="${PHYSICS_ROOT:-$LFRIC_SRC_REPO/vendor/physics}"
-export PYTHONDONTWRITEBYTECODE=1
+# --- LFRic source -----------------------------------------------------------
+# Staged by scripts/stage-sources.sh + patched by scripts/patch-all.sh. Pointing
+# LFRIC_SRC_REPO at the sibling Spack repo reuses ITS vendored source instead --
+# identical source, so the comparison isolates the environment (that is how this
+# example was first proven, before this repo staged its own).
+if [ -n "${LFRIC_SRC_REPO:-}" ]; then
+  APPS_ROOT_DIR="${LFRIC_APPS_ROOT:-$LFRIC_SRC_REPO/vendor/lfric_apps}"
+  CORE_ROOT_DIR="${LFRIC_CORE_ROOT:-$LFRIC_SRC_REPO/vendor/lfric_core}"
+  export PHYSICS_ROOT="${PHYSICS_ROOT:-$LFRIC_SRC_REPO/vendor/physics}"
+else
+  # lfric-env-activate.sh already defaulted these to $LFRIC_VENDOR_DIR/...
+  APPS_ROOT_DIR="${LFRIC_APPS_ROOT:-$APPS_ROOT_DIR}"
+  CORE_ROOT_DIR="${LFRIC_CORE_ROOT:-$CORE_ROOT_DIR}"
+fi
+export APPS_ROOT_DIR CORE_ROOT_DIR
 
-[ -f "$APPS_ROOT_DIR/build/local_build.py" ] || die "local_build.py not found under $APPS_ROOT_DIR/build (is $LFRIC_SRC_REPO the Spack repo with vendored LFRic source, patched via patch-all.sh?)"
+[ -f "$APPS_ROOT_DIR/build/local_build.py" ] \
+  || die "local_build.py not found under $APPS_ROOT_DIR/build -- stage the source first: bash scripts/stage-sources.sh && bash scripts/patch-all.sh"
+[ -d "$CORE_ROOT_DIR/infrastructure/build" ] \
+  || die "lfric_core not found at $CORE_ROOT_DIR -- run: bash scripts/stage-sources.sh"
 for d in casim jules socrates ukca; do
-  [ -e "$PHYSICS_ROOT/$d/.git" ] || die "physics submodule '$d' not initialised under $PHYSICS_ROOT"
+  [ -d "$PHYSICS_ROOT/$d" ] \
+    || die "physics source '$d' not staged under $PHYSICS_ROOT -- run: bash scripts/stage-sources.sh"
 done
+# The offline-source patch is what stops local_build.py cloning mid-build; without
+# it the build silently reaches the network and the pinned refs stop meaning anything.
+grep -q "PATCHED (lfric-env-isambard)" "$APPS_ROOT_DIR/build/extract/get_git_sources.py" 2>/dev/null \
+  || die "source tree is not patched -- run: bash scripts/patch-all.sh"
 
 PSYCLONE_TRANSFORMATION="${PSYCLONE_TRANSFORMATION:-minimum}"
-MAKE_JOBS="${MAKE_JOBS:-16}"
-# Default the (large, transient) build dir into the conda repo's gitignored
-# output/, which is on the same writable scratch as the repo -- rather than
-# guessing the scratch path layout.
-_here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
-CONDA_REPO_ROOT="$(cd -- "$_here/../.." && pwd)"
-WORK_DIR="${WORK_DIR:-$CONDA_REPO_ROOT/output/lfric_atm_build}"
+# Default to the machine's core count (capped: LFRic's link steps are memory-hungry,
+# and a 4-vCPU CI runner must not be told to run 16 compilers).
+_ncpu="$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null) || echo 4)"
+MAKE_JOBS="${MAKE_JOBS:-$(( _ncpu > 16 ? 16 : _ncpu ))}"
+# Default the (large, transient) build dir into the repo's gitignored output/.
+WORK_DIR="${WORK_DIR:-$REPO_ROOT/output/lfric_atm_build}"
 LOG="${LOG:-$WORK_DIR/lfric_atm-make.log}"
 mkdir -p "$WORK_DIR" || die "cannot create WORK_DIR=$WORK_DIR"
 

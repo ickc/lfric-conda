@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/test-env.sh [env-yaml]
 #
-# Create the MVP-1 environment from envs/ (plus the local channel, so
+# Create the Stage-1 environment from envs/ (plus the local channel, so
 # locally-built packages are picked up) and smoke-test the toolchain it exports:
 # compile and run a Fortran program that does `use mpi` + `use netcdf`.
 #
@@ -17,7 +17,11 @@ _here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd)"
 # shellcheck source=scripts/common.sh
 . "$_here/common.sh"
 
-ENV_YAML="${1:-$REPO_ROOT/envs/lfric-env-mvp1.yaml}"
+# Default to the FULL Stage-1 environment (the counterpart of the Spack repo's
+# lfric-apps-isambard bundle -- see docs/stage1-parity.md). Pass one of the
+# narrower tier envs to check just that layer, e.g.
+#   bash scripts/test-env.sh envs/lfric-env-mvp1.yaml
+ENV_YAML="${1:-$REPO_ROOT/envs/lfric-env.yaml}"
 [ -f "$ENV_YAML" ] || die "no environment file at $ENV_YAML"
 ENV_NAME="${LFRIC_CONDA_ENV_NAME:-lfric-conda-test}"
 
