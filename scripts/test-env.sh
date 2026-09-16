@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # scripts/test-env.sh [env-yaml]
 #
-# Create the Stage-1 environment from envs/ (plus the local channel, so
-# locally-built packages are picked up) and smoke-test the toolchain it exports:
+# Create the Stage-1 environment from envs/ and smoke-test the toolchain it exports:
 # compile and run a Fortran program that does `use mpi` + `use netcdf`.
 #
 # This is the cheap integration check -- the conda analogue of `concretize.sh` +
@@ -29,12 +28,8 @@ ENV_NAME="${LFRIC_CONDA_ENV_NAME:-lfric-conda-test}"
 MAMBA_EXE="${MAMBA_EXE:-$(command -v micromamba || true)}"
 [ -n "$MAMBA_EXE" ] || die "micromamba not on PATH (set MAMBA_EXE to your conda/mamba binary)"
 
-chan_args=()
-[ -d "$LOCAL_CHANNEL" ] && chan_args+=(-c "file://$LOCAL_CHANNEL")
-chan_args+=(-c conda-forge)
-
 info "Creating '$ENV_NAME' from $ENV_YAML"
-"$MAMBA_EXE" create -n "$ENV_NAME" -y -f "$ENV_YAML" "${chan_args[@]}"
+"$MAMBA_EXE" create -n "$ENV_NAME" -y -f "$ENV_YAML"
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

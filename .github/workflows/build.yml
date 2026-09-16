@@ -1,15 +1,10 @@
-# Build every recipe on every target platform.
+# CI: lint, then use the environment.
 #
-# Structure: one reusable workflow (build-pkg.yml) builds a single recipe across
-# the whole platform matrix; this file calls it once per package and wires the
-# build-dependency DAG with `needs:`. The result is a per-(package x platform)
-# grid of status checks that fail and re-run independently -- so iterating on,
-# say, xios on osx-arm64 does not rebuild the packages that already pass.
-#
-# Platforms: linux-64, linux-aarch64 (primary -- Isambard 3 is Cray EX / Grace),
-# and osx-64 + osx-arm64 (developer tier -- see docs/platform-coverage.md).
-# Windows is deliberately out of scope (no conda-forge mpich; the underlying HPC
-# codes have no Windows build) -- also documented there.
+# Every package in envs/lfric-env.yaml comes from conda-forge, where the LFRic
+# packages this repo started are built per platform on their own feedstocks. What
+# is left to test here is the part no feedstock can: that the assembled
+# environment really is a drop-in LFRic Stage-1 environment. The stage2 jobs
+# below do that on linux-64 and linux-aarch64 (Isambard 3 is Cray EX / Grace).
 name: build
 
 on:
@@ -20,14 +15,11 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # Only cancel superseded PR runs. On main every commit's packages matter.
+  # Only cancel superseded PR runs. On main every commit's result matters.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Passed through to the reusable workflow; `gh run download` needs actions:read
-# to restore dependency artifacts within the same run.
 permissions:
   contents: read
-  actions: read
 
 jobs:
   lint:
@@ -37,12 +29,11 @@ jobs:
       - name: shellcheck
         run: |
           shellcheck --version
-          # Recipe build/test scripts, the LFRic-source patches and the Stage-2
-          # example scripts are all shipped and executed too, so lint them
+          # The LFRic-source patches and the Stage-2 example scripts are shipped
+          # and executed too, so lint them
           # alongside scripts/ rather than only checking the drivers.
           scripts_to_check=(
             scripts/*.sh
-            recipes/*/build.sh recipes/*/*test*.sh
             patches/*.sh
             examples/*/*.sh
             examples/science-suites/site/*.sh
@@ -80,88 +71,19 @@ jobs:
             echo "::endgroup::"
           done
 
-  # --- roots (no dependency on another package in our channel) ---------------
-  rose-picker:
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: rose-picker
-
-  blitzpp:
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: blitzpp
-
-  yaxt:
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: yaxt
-
-  shumlib:
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: shumlib
-
-  gftl:
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: gftl
-
-  # --- dependents (build against our own channel) ---------------------------
-  # `if: !cancelled()` so that a dependency failing on ONE platform does not skip
-  # the whole dependent job -- only the matching platform cell fails (when it
-  # cannot restore that platform's dependency artifact).
-  xios:
-    needs: [blitzpp]
-    if: ${{ !cancelled() }}
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: xios
-      deps: blitzpp
-
-  gftl-shared:
-    needs: [gftl]
-    if: ${{ !cancelled() }}
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: gftl-shared
-      deps: gftl
-
-  fargparse:
-    needs: [gftl, gftl-shared]
-    if: ${{ !cancelled() }}
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: fargparse
-      deps: gftl gftl-shared
-
-  pfunit:
-    needs: [gftl, gftl-shared, fargparse]
-    if: ${{ !cancelled() }}
-    uses: ./.github/workflows/build-pkg.yml
-    with:
-      package: pfunit
-      deps: gftl gftl-shared fargparse
-
   # --- Stage 2: use the environment ----------------------------------------
-  # Everything above builds the ENVIRONMENT. These two jobs are the point of it:
-  # they assemble envs/lfric-env.yaml from the artifacts above plus conda-forge,
-  # and then do real LFRic work with it -- compile the science target, and run a
-  # real Rose/Cylc science suite end to end (extract -> build -> mesh -> run).
+  # These two jobs are the point of the repo: they assemble envs/lfric-env.yaml
+  # from conda-forge, and then do real LFRic work with it -- compile the science
+  # target, and run a real Rose/Cylc science suite end to end (extract -> build ->
+  # mesh -> run).
   # They are what makes "the conda environment is a drop-in for the Spack one" a
   # tested claim rather than an assertion. See .github/workflows/stage2.yml.
-  #
-  # They depend on every package the environment resolves from our channel, so
-  # they run only once the whole Stage-1 grid is green for their platform.
   stage2-compile:
-    needs: [rose-picker, blitzpp, yaxt, xios, shumlib, gftl, gftl-shared, fargparse, pfunit]
-    if: ${{ !cancelled() }}
     uses: ./.github/workflows/stage2.yml
     with:
       example: minimal-compile
 
   stage2-suite:
-    needs: [rose-picker, blitzpp, yaxt, xios, shumlib, gftl, gftl-shared, fargparse, pfunit]
-    if: ${{ !cancelled() }}
     uses: ./.github/workflows/stage2.yml
     with:
       example: science-suite
