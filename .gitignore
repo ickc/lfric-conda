@@ -13,3 +13,6 @@ __pycache__/
 
 # Stage-2 LFRic source, staged by scripts/stage-sources.sh
 vendor/
+
+# Slurm job logs (examples/*/*.sbatch)
+logs/
