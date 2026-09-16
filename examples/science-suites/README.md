@@ -5,7 +5,7 @@ conda environment. Scientists run LFRic this way — `cylc` schedules the task g
 (extract → build → mesh → run) and `rose` materialises each task's namelists — so
 this example runs it *that* way rather than reinventing it.
 
-> The core of this repo is the **environment** (Stage 1, `recipes/`). These suites
+> The core of this repo is the **environment** (Stage 1, `envs/lfric-env.yaml`). These suites
 > are not that core — they are things you do *with* it, and templates to copy. They
 > are ported from the same examples in [ickc/lfric-env-isambard][spack-repo], which
 > ported them from the upstream [Isambard3-LFRic-Env-Science-Suites][upstream].
@@ -21,7 +21,7 @@ extra to install: `run-suite.sh` activates it and the tasks use that same `cylc`
 
 ```bash
 bash scripts/stage-sources.sh                        # once: the LFRic source
-micromamba create -n lfric-env -f envs/lfric-env.yaml -c ./local-channel -c conda-forge
+micromamba create -n lfric-env -f envs/lfric-env.yaml
 micromamba run -n lfric-env bash examples/science-suites/run-suite.sh u-dr932
 ```
 

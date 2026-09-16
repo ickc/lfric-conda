@@ -1,8 +1,8 @@
 # lfric-conda
 
-Conda packages for the **LFRic Stage-1 environment** — an independent way to
-bootstrap the environment that Met Office LFRic science workflows build and run
-against.
+The **LFRic Stage-1 environment**, assembled from conda-forge packages — an
+independent way to bootstrap the environment that Met Office LFRic science
+workflows build and run against.
 
 ## What this is
 
@@ -28,29 +28,28 @@ the compilers too, not just the runtime libraries.
 
 ## Status
 
-See [`docs/proposal.md`](docs/proposal.md) for the full survey of what Stage 1
-contains, what conda-forge already provides, and what has to be packaged.
-
-The short version: **conda-forge already has almost everything** — including
+**Everything the environment needs is on conda-forge.** Most of it always was —
 `psyclone`, `fparser`, `sci-fab`, `metomi-rose`, `cylc-flow`, `cylc-rose`, the
-gfortran 14.3 toolchain, and `mpi_mpich_*` builds of `hdf5`/`libnetcdf`/
-`netcdf-fortran`. The gap, and where it stands:
+GNU toolchain, and `mpi_mpich_*` builds of `hdf5`/`libnetcdf`/`netcdf-fortran`.
+The gap was packaged in this repo first and then upstreamed; each package now
+lives on its own feedstock, built for `linux-64`, `linux-aarch64`, `osx-64` and
+`osx-arm64`:
 
-| package | status |
+| package | feedstock |
 |---|---|
-| `xios` | ✅ packaged — the hard one (FCM / `make_xios`) |
-| `blitzpp` | ✅ packaged (XIOS dep; the name `blitz` is taken by Blitz.js) |
-| `rose-picker` | ✅ packaged (`noarch: python`) |
-| `yaxt` | ✅ packaged — built `--with-idxtype=long` (64-bit `Xt_int`, required by LFRic); upstream feedstock also needs a `linux-aarch64` build |
-| `shumlib` | ✅ packaged (apps tier — `lfric_apps` links `-lshum`) |
-| `gftl`, `gftl-shared`, `fargparse`, `pfunit` | ✅ packaged (unit-test tier; versioned-subdir CMake installs) |
+| `xios` | [conda-forge/xios-feedstock](https://github.com/conda-forge/xios-feedstock) — the hard one (FCM / `make_xios`) |
+| `blitzpp` | [conda-forge/blitzpp-feedstock](https://github.com/conda-forge/blitzpp-feedstock) (XIOS dep; the name `blitz` is taken by Blitz.js) |
+| `rose-picker` | [conda-forge/rose-picker-feedstock](https://github.com/conda-forge/rose-picker-feedstock) (`noarch: python`) |
+| `yaxt` | [conda-forge/yaxt-feedstock](https://github.com/conda-forge/yaxt-feedstock) — existing feedstock; gained `linux-aarch64`/`osx-arm64` and the opt-in `idxtype_long` (64-bit `Xt_int`) build LFRic requires |
+| `shumlib` | [conda-forge/shumlib-feedstock](https://github.com/conda-forge/shumlib-feedstock) (apps tier — `lfric_apps` links `-lshum`) |
+| `gftl`, `gftl-shared`, `fargparse`, `pfunit` | [gftl](https://github.com/conda-forge/gftl-feedstock), [gftl-shared](https://github.com/conda-forge/gftl-shared-feedstock), [fargparse](https://github.com/conda-forge/fargparse-feedstock), [pfunit](https://github.com/conda-forge/pfunit-feedstock) (unit-test tier) |
 
-**All nine build green in CI on `linux-64`, `linux-aarch64`, `osx-arm64`, and
-`osx-64`** (Apple Silicon + Intel Mac). See
+So this repo no longer builds packages. What is left here is the part no
+feedstock can own: the environment definition, the activation contract, and the
+Stage-2 examples that prove the two add up to a working LFRic environment. See
 [`docs/platform-coverage.md`](docs/platform-coverage.md) for the per-package
-support policy, the clang-vs-GNU decision, the macOS runner details, and why
-Windows is out of scope. Nothing has been upstreamed to conda-forge yet — see
-[Upstreaming](#upstreaming).
+platform policy and why Windows is out of scope, and
+[`docs/proposal.md`](docs/proposal.md) for the original survey.
 
 **Stage 2 works, and is tested:** both Stage-2 examples run against this
 environment in CI on `linux-64` and `linux-aarch64` — the science target
@@ -58,18 +57,19 @@ environment in CI on `linux-64` and `linux-aarch64` — the science target
 end to end on it (extract → build → mesh → **run the model**). See
 [Stage 2](#stage-2--using-the-environment).
 
-**Is it the same environment Spack gives you?** Yes, with two intended
-differences — audited package by package and variable by variable in
+**Is it the same environment Spack gives you?** Yes, with three intended
+differences (the MPI stack, `foxml`, and gcc 15.3 instead of 14.3) — audited
+package by package and variable by variable in
 [`docs/stage1-parity.md`](docs/stage1-parity.md).
 
 ## The environment
 
 [`envs/lfric-env.yaml`](envs/lfric-env.yaml) is the full Stage-1 environment: one
-spec per direct dependency of the Spack repo's `lfric-apps-isambard` bundle. Until
-the packages above are on conda-forge it needs the local channel:
+spec per direct dependency of the Spack repo's `lfric-apps-isambard` bundle, all
+from conda-forge:
 
 ```console
-$ bash scripts/build-all.sh                 # populates ./local-channel
+$ micromamba create -n lfric-env -f envs/lfric-env.yaml
 $ bash scripts/test-env.sh                  # creates the env and smoke-tests it
 ```
 
@@ -117,7 +117,7 @@ apps-tier target `lfric_atm` (~98 MB, linking the env's
 `yaxt`/`netcdf`/`mpich`/`hdf5`):
 
 ```console
-$ micromamba create -n lfric-env -f envs/lfric-env.yaml -c ./local-channel -c conda-forge
+$ micromamba create -n lfric-env -f envs/lfric-env.yaml
 $ micromamba run -n lfric-env bash examples/minimal-compile/build.sh
 ...
 LFRIC_ATM_OK
@@ -156,23 +156,17 @@ are non-obvious and were only found by compiling:
 
 ## Upstreaming
 
-Recipes are developed here and upstreamed to conda-forge one at a time, easiest
-first, so the process is learned on cheap PRs:
+Done. The recipes were developed here, then upstreamed through
+[staged-recipes](https://github.com/conda-forge/staged-recipes) (and, for `yaxt`,
+conda-forge/yaxt-feedstock#6), and the in-repo copies were removed so they cannot
+drift from the feedstocks. Recipe changes now go to the feedstocks.
 
-1. `rose-picker` — trivial `noarch: python`
-2. `yaxt` — **not a new recipe**: the feedstock exists and its recipe has no
-   aarch64 skip, it just never enabled the platform in `conda-forge.yml`. A
-   one-line `provider: {linux_aarch64: azure}` migration PR. That it builds here
-   on aarch64 is the evidence nothing else is in the way.
-3. `blitzpp`
-4. `gftl`, `gftl-shared`, `fargparse`, `pfunit`
-5. `shumlib` — approach ACCESS-NRI first, who already maintain a recipe
-6. `xios` — last; hardest; may stay in-house longest
-
-The local channel means none of this blocks development.
+The one piece still proposed rather than accepted is an `lfric-env` metapackage —
+this repo's `envs/lfric-env.yaml` plus `scripts/lfric-env-activate.sh`, as a
+package. Until (unless) that lands, this repo is the way to get the environment.
 
 ## Licence
 
 The packaging in this repo is BSD-3-Clause (see [`LICENSE`](LICENSE)), matching
 conda-forge feedstock convention. Each *packaged* project keeps its own upstream
-licence, recorded in its recipe.
+licence, recorded in its feedstock's recipe.
