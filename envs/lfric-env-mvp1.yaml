@@ -8,10 +8,10 @@ name: lfric-env-mvp1
 channels:
   - conda-forge
 dependencies:
-  # --- toolchain (pinned to match the Spack env's gcc@14.3.0) ---------------
-  - gcc_linux-aarch64 14.3.*
-  - gxx_linux-aarch64 14.3.*
-  - gfortran_linux-aarch64 14.3.*
+  # --- toolchain (gcc 15.3: conda-forge's Fortran module generation) --------
+  - gcc_linux-aarch64 15.3.*
+  - gxx_linux-aarch64 15.3.*
+  - gfortran_linux-aarch64 15.3.*
   # --- MPI + parallel I/O ---------------------------------------------------
   - mpich
   - hdf5 * mpi_mpich_*

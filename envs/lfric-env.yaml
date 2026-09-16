@@ -10,8 +10,14 @@
 # Portable across linux-64 and linux-aarch64: the compilers come in through the
 # arch-independent metapackages (c-/cxx-/fortran-compiler pull the right
 # <name>_linux-<arch> ACTIVATION packages, which is what exports FC/GXX/
-# CONDA_TOOLCHAIN_HOST and hence what scripts/lfric-env-activate.sh builds on),
-# pinned to the gcc 14.3 the Spack environment uses.
+# CONDA_TOOLCHAIN_HOST and hence what scripts/lfric-env-activate.sh builds on).
+#
+# The toolchain is gcc 15.3, NOT the Spack env's gcc 14.3, and this is forced:
+# gfortran can only read .mod files from its own module-format generation, and
+# conda-forge now builds its Fortran stack (mpich's mpi.mod, yaxt, xios, shumlib,
+# ...) with gfortran 15, whose module format gfortran 14 rejects with "created by
+# a different version of GNU Fortran". The pin tracks conda-forge's global
+# `fortran_compiler_version`; see docs/stage1-parity.md.
 #
 # Every package resolves from conda-forge. The LFRic-specific ones (xios, blitzpp,
 # shumlib, rose-picker, and the gftl/gftl-shared/fargparse/pfunit unit-test tier)
@@ -28,13 +34,13 @@ name: lfric-env
 channels:
   - conda-forge
 dependencies:
-  # --- toolchain (gcc 14.3, matching the Spack env's gcc@14.3.0) ------------
-  - c-compiler 1.11.*
-  - cxx-compiler 1.11.*
-  - fortran-compiler 1.11.*
-  - gcc 14.3.*
-  - gxx 14.3.*
-  - gfortran 14.3.*
+  # --- toolchain (gcc 15.3: conda-forge's Fortran module generation) --------
+  - c-compiler
+  - cxx-compiler
+  - fortran-compiler
+  - gcc 15.3.*
+  - gxx 15.3.*
+  - gfortran 15.3.*
   # --- MPI + parallel I/O ---------------------------------------------------
   - mpich
   - hdf5 * mpi_mpich_*
