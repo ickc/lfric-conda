@@ -5,9 +5,7 @@
 # The pfunit group (gftl/gftl-shared/fargparse/pfunit) is deliberately absent: it
 # is needed only to build LFRic's unit tests, not any application or science run.
 #
-# Everything but the four packaged libraries (xios, blitzpp, rose-picker, yaxt) and
-# shumlib comes from conda-forge; until those are upstreamed they resolve from the
-# local channel (scripts/test-env.sh and the stage-2 build pass it; see README).
+# Everything comes from conda-forge.
 name: lfric-env-mvp2
 channels:
   - conda-forge
@@ -39,10 +37,9 @@ dependencies:
   - cylc-rose
   - ansimarkup
   - colorama
-  # --- packaged by this project (see recipes/) ------------------------------
-  # Not on conda-forge yet, so these come from the local channel for now.
+  # --- LFRic-specific packages (conda-forge feedstocks started here) --------
   - xios 2.2701 mpi_mpich_*
   - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
   - rose-picker            # generates LFRic's Fortran config loaders
-  - yaxt * mpi_mpich_*     # on conda-forge, but not yet built for linux-aarch64
+  - yaxt * mpi_mpich_idxtype_long_*  # 64-bit Xt_int, as LFRic needs
   - shumlib                # lfric_apps links -lshum (UM physics utilities)

@@ -13,20 +13,20 @@
 # CONDA_TOOLCHAIN_HOST and hence what scripts/lfric-env-activate.sh builds on),
 # pinned to the gcc 14.3 the Spack environment uses.
 #
-# Six packages are not on conda-forge yet and resolve from the local channel --
-# see README.md ("Upstreaming"); they are marked below.
+# Every package resolves from conda-forge. The LFRic-specific ones (xios, blitzpp,
+# shumlib, rose-picker, and the gftl/gftl-shared/fargparse/pfunit unit-test tier)
+# were packaged in this repo first and now live on their own conda-forge
+# feedstocks; see README.md ("Upstreaming").
 #
-# NO `channels:` key here on purpose. The channel list must be supplied by the
-# caller, in a deliberate order with the local channel FIRST:
-#   local:  micromamba create -f envs/lfric-env.yaml -c ./local-channel -c conda-forge
-#   CI:     via a strict-priority condarc (see .github/workflows/stage2.yml)
-# If this file listed `conda-forge`, that entry merges AHEAD of the caller's local
-# channel and outranks it even under strict priority -- which silently pulls
-# conda-forge's `yaxt` (built with the default 32-bit Xt_int) over the local
-# `--with-idxtype=long` build LFRic requires, and the compile fails at link with
-# `no specific function for the generic 'xt_idxvec_new'`. Keeping channels out of
-# the file makes the caller's order authoritative.
+# yaxt is the one to read carefully. conda-forge publishes it in two ABIs, and the
+# DEFAULT build has a 32-bit Xt_int. LFRic's halo index is 64-bit, so it needs the
+# `--with-idxtype=long` build, which carries `idxtype_long` in its build string.
+# The pin below selects it explicitly: solving onto the 32-bit build is not a
+# clean error, the lfric_atm compile fails at link with
+# `no specific function for the generic 'xt_idxvec_new'`.
 name: lfric-env
+channels:
+  - conda-forge
 dependencies:
   # --- toolchain (gcc 14.3, matching the Spack env's gcc@14.3.0) ------------
   - c-compiler 1.11.*
@@ -58,16 +58,15 @@ dependencies:
   - cylc-rose
   - ansimarkup
   - colorama
-  # --- packaged by this project (see recipes/) ------------------------------
-  # Not on conda-forge yet, so these come from the local channel for now.
+  # --- LFRic-specific packages (conda-forge feedstocks started here) --------
   - xios 2.2701 mpi_mpich_*
   - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
   - rose-picker            # generates LFRic's Fortran config loaders
-  - yaxt * mpi_mpich_*     # on conda-forge, but not yet built for linux-aarch64
+  - yaxt * mpi_mpich_idxtype_long_*  # 64-bit Xt_int -- see the header
   - shumlib                # lfric_apps links -lshum (UM physics utilities)
   # The unit-test tier. Not needed to build or run an application, but the Spack
   # bundle carries it (pfunit+mpi), so the parity environment does too.
-  - pfunit
+  - pfunit * mpi_mpich_*
   - gftl
   - gftl-shared
   - fargparse
