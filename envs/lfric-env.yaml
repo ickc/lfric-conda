@@ -8,9 +8,10 @@
 # docs/stage1-parity.md.
 #
 # Portable across linux-64 and linux-aarch64: the compilers come in through the
-# arch-independent metapackages (c-/cxx-/fortran-compiler pull the right
-# <name>_linux-<arch> ACTIVATION packages, which is what exports FC/GXX/
-# CONDA_TOOLCHAIN_HOST and hence what scripts/lfric-env-activate.sh builds on).
+# arch-independent metapackages (c-/cxx-/fortran-compiler). Since 2.x those install
+# the plain gcc/gxx/gfortran drivers without the <name>_linux-<arch> activation
+# scripts, so GXX/CONDA_TOOLCHAIN_HOST are not exported;
+# scripts/lfric-env-activate.sh finds the triplet-named g++ driver itself.
 #
 # The toolchain is gcc 15.3, NOT the Spack env's gcc 14.3, and this is forced:
 # gfortran can only read .mod files from its own module-format generation, and
