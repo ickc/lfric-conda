@@ -1,21 +1,22 @@
 # Platform coverage
 
-Which operating systems and architectures these packages are built for, why, and
-how it is wired. Companion to [`proposal.md`](proposal.md) (what Stage 1 contains)
+Which operating systems and architectures the LFRic packages are built for, and
+why. The packages were built in this repo while they were being upstreamed; they
+now live on conda-forge feedstocks, which build all four platforms below, so the
+build wiring this document used to describe is theirs now. Companion to [`proposal.md`](proposal.md) (what Stage 1 contains)
 and the repo [`README.md`](../README.md) (per-package status).
 
 ## Summary
 
 | target | tier | who | status |
 |---|---|---|---|
-| `linux-64` | **production** | build farms, CI | supported (9/9 green) |
-| `linux-aarch64` | **production** | Isambard 3 (Cray EX / Grace) | supported (9/9 green) |
-| `osx-arm64` | **developer** | Apple-Silicon laptops | **supported (9/9 green)** |
-| `osx-64` | developer (best-effort) | Intel Macs (declining) | **supported (9/9 green), but GitHub drops Intel CI Aug 2027** |
+| `linux-64` | **production** | build farms, CI | supported (conda-forge) |
+| `linux-aarch64` | **production** | Isambard 3 (Cray EX / Grace) | supported (conda-forge) |
+| `osx-arm64` | **developer** | Apple-Silicon laptops | **supported (conda-forge)** |
+| `osx-64` | developer (best-effort) | Intel Macs (declining) | **supported (conda-forge), while Intel macOS CI lasts** |
 | `win-64` | — | — | **out of scope** (see below) |
 
-All nine packages build green on all four platforms in CI (see
-[the CI grid](#ci)). Linux is and stays the production target — every real LFRic
+All nine packages are published for all four platforms on conda-forge. Linux is and stays the production target — every real LFRic
 run is on Isambard 3. macOS is a **developer-convenience** tier: letting someone
 build and hack on the LFRic pieces on a Mac. It is worth doing anyway because
 **conda-forge upstreaming requires each feedstock to build wherever its source
@@ -85,8 +86,8 @@ and C/C++ is clang. This is handled by [per-OS variant overlays](#variant-config
 | `xios` | ✓ | ✓ | ships a **`GCC_MACOSX`** arch; "builds with clang+gfortran on OSX" | ✅ green (needed `-lc++`) | ✗ (no mpich) |
 | `shumlib` | – | ✓ | CMake build; no prior macOS precedent, but portable in practice | ✅ green | ✗ |
 
-All nine build green on osx-64 and osx-arm64 in CI. The infrastructure they need
-(mpich, mpi-variant hdf5/netcdf, gfortran 14, the noarch python tools) is all
+All nine build green on osx-64 and osx-arm64. The infrastructure they need
+(mpich, mpi-variant hdf5/netcdf, gfortran, the noarch python tools) is all
 present on osx, and the two rows that looked like real risks resolved cleanly:
 
 - **`xios`** — its FCM build reads a hand-written `arch-*` triplet. The only osx
@@ -137,8 +138,9 @@ Crucially, choosing clang now does **not** paint us into a corner, because of th
 repo's **recipe ⟂ variant separation**: the recipe is compiler-agnostic
 (`${{ compiler('cxx') }}`); *which* compiler it resolves to is set by the variant
 config, not the recipe. conda-forge's pinning resolves it to clang on osx (what we
-upstream); if we later pursue a Stage-2 compile on a Mac, our **local** `variants/`
-can resolve the *same, unchanged* recipe to `gxx` on osx — no recipe fork. So:
+upstream); if we later pursue a Stage-2 compile on a Mac, a local variant config
+can resolve the *same, unchanged* feedstock recipe to `gxx` on osx — no recipe
+fork. So:
 
 - We do **not** ship two compiler variants of each package (a compiler-ABI variant
   axis, unlike MPI, is not something conda-forge has or wants — it would only ever
@@ -164,76 +166,31 @@ variant tweak.
 
 ## How it is implemented
 
-### Variant config
+On the conda-forge feedstocks: each one enables `linux_aarch64` and `osx_arm64`
+through `provider:` in its `conda-forge.yml` (native GitHub Actions arm runners
+and Azure Apple-Silicon agents respectively), and builds against conda-forge's
+global pinning. The clang-on-osx decision above is simply what that pinning does,
+which is why no per-OS variant overlay is needed any more.
 
-rattler-build does **not** honour conda-build `# [osx]` selector comments inside a
-variant file, but it **does merge multiple `--variant-config` files**. So the
-config is split:
-
-- [`variants/conda_build_config.yaml`](../variants/conda_build_config.yaml) —
-  common keys (`mpi`, `fortran_compiler_version: 14`).
-- [`variants/linux.yaml`](../variants/linux.yaml) — glibc `sysroot` 2.28, gcc/g++ 14.
-- [`variants/osx.yaml`](../variants/osx.yaml) — `macosx_deployment_target` 11.0,
-  clang/clang++ 19.
-
-[`scripts/common.sh`](../scripts/common.sh) picks the overlay by `uname` (the build
-host is the native target both in CI and locally) and
-[`scripts/build-recipe.sh`](../scripts/build-recipe.sh) passes base + overlay. The
-union of base + `linux.yaml` is value-identical to the previous single file, so
-linux builds are unchanged.
-
-### CI
-
-One reusable workflow, [`build-pkg.yml`](../.github/workflows/build-pkg.yml),
-builds a single recipe across the four-platform matrix (`ubuntu-latest` →
-linux-64, `ubuntu-24.04-arm` → linux-aarch64, `macos-14` → osx-arm64,
-`macos-15-intel` → osx-64). The orchestrator,
-[`build.yml`](../.github/workflows/build.yml), calls it once per package and wires
-the build-dependency DAG with `needs:`:
-
-```
-roots:      rose-picker  blitzpp  yaxt  shumlib  gftl
-dependents: xios→blitzpp   gftl-shared→gftl   fargparse→{gftl,gftl-shared}
-            pfunit→{gftl,gftl-shared,fargparse}
-```
-
-Each package uploads its built channel as `chan-<package>-<target>`; a dependent
-restores its deps' channels (same run, per-dep directories so their
-`repodata.json` do not collide) and points `scripts/build-recipe.sh` at them via
-`LFRIC_DEP_CHANNELS`. The result is a per-(package × platform) grid of checks that
-fail and re-run independently — so iterating on one package/platform does not
-rebuild the ones that already pass.
-
-### macOS runner labels (and a caveat with a shelf life)
-
-The osx-64 runner is **`macos-15-intel`**, not `macos-13`. GitHub **retired the
-macos-13 (Intel) image in December 2025**; a retired label does not error — its
-jobs sit `queued` forever, and because job-level `needs:` waits for *completion*,
-one stuck osx-64 cell silently blocked the entire dependent DAG. `macos-15-intel`
-is the current — and, per GitHub, **the last** — x86_64 macOS image, supported
-until **August 2027**, after which Intel is dropped from Actions entirely. So:
-
-- osx-64 CI is inherently **time-boxed** (gone by Aug 2027). The recipes and
-  variant config support osx-64 identically to osx-arm64 (same clang + gfortran),
-  so after that it can still be built on an Intel Mac or a paid larger runner — it
-  just stops being free-CI-gated. **osx-arm64 is the durable Mac target.**
-- Prefer live runner labels and lean on `if: !cancelled()` for the best-effort
-  legs: a live label that is ever unavailable *fast-fails* (and dependents on the
-  other platforms keep flowing), whereas a retired label hangs.
+The Stage-2 examples run in this repo's CI
+([`stage2.yml`](../.github/workflows/stage2.yml)) on `linux-64` and
+`linux-aarch64`, against an environment solved straight from conda-forge.
 
 ## Appendix: verified facts
 
-conda-forge global pinning ([`conda-forge-pinning-feedstock`], July 2026):
+conda-forge global pinning ([`conda-forge-pinning-feedstock`], September 2026):
 
 | key | linux | osx | win |
 |---|---|---|---|
-| `fortran_compiler_version` | 14 | **14** | 5 |
-| `c_compiler_version` / `cxx_compiler_version` | 14 (gcc) | **19 (clang)** | — |
+| `fortran_compiler_version` | 15 | **15** | 5 |
+| `c_compiler_version` / `cxx_compiler_version` | 15 (gcc) | **21 (clang)** | — |
 | `c_stdlib` | `sysroot` | `macosx_deployment_target` | `vs` |
 | `c_stdlib_version` | 2.17¹ | **11.0** | — |
 
-¹ we use 2.28 on linux, not conda-forge's 2.17 — required so MPI links against
-conda-forge's libfabric (`getrandom@GLIBC_2.25`); see `variants/linux.yaml`.
+¹ conda-forge's libfabric (pulled in by mpich) references `getrandom@GLIBC_2.25`.
+The in-repo builds raised the sysroot to 2.28 for it; the xios feedstock instead
+keeps the 2.17 baseline and defers that one check to runtime
+(`-Wl,--allow-shlib-undefined` on its link step).
 
 Availability (conda-forge, confirmed via the solver / anaconda.org API):
 
@@ -244,7 +201,6 @@ Availability (conda-forge, confirmed via the solver / anaconda.org API):
   `osx-arm64` (and osx-64).
 - `psyclone`, `fparser`, `sci-fab`, `metomi-rose`, `cylc-flow`, `cylc-rose`:
   `noarch` — available on every platform.
-- `yaxt` already on conda-forge for `linux-64` + `osx-64` (source is mac-portable;
-  `osx-arm64`/`linux-aarch64` are migration gaps, not source skips).
+- `yaxt`: all four platforms, in both `Xt_int` ABIs (conda-forge/yaxt-feedstock#6).
 
 [`conda-forge-pinning-feedstock`]: https://github.com/conda-forge/conda-forge-pinning-feedstock/blob/main/recipe/conda_build_config.yaml

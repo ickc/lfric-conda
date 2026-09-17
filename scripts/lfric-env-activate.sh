@@ -130,7 +130,19 @@ if [ -z "${MPICH_CXX:-}" ]; then
   elif [ -n "${CONDA_TOOLCHAIN_HOST:-}" ] && [ -x "$CONDA_PREFIX/bin/$CONDA_TOOLCHAIN_HOST-g++" ]; then
     export MPICH_CXX="$CONDA_PREFIX/bin/$CONDA_TOOLCHAIN_HOST-g++"
   else
-    _lfric_env_warn "no GXX/CONDA_TOOLCHAIN_HOST -- MPICH_CXX unset; lfric_core's cxx/mpic++.mk may not recognise the C++ backend"
+    # Neither is set when the compilers come in without their activation
+    # scripts, which is what conda-forge's c-/cxx-compiler 2.x metapackages do
+    # (plain gxx + conda-gcc-specs, no gxx_<subdir>). The triplet-named driver
+    # is still installed in the prefix, so find it directly.
+    for _lfric_gpp in "$CONDA_PREFIX"/bin/*-g++; do
+      if [ -x "$_lfric_gpp" ]; then
+        export MPICH_CXX="$_lfric_gpp"
+        break
+      fi
+    done
+    unset _lfric_gpp
+    [ -n "${MPICH_CXX:-}" ] \
+      || _lfric_env_warn "no g++ driver found -- MPICH_CXX unset; lfric_core's cxx/mpic++.mk may not recognise the C++ backend"
   fi
 fi
 unset _lfric_gxx

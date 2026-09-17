@@ -1,7 +1,7 @@
 # sources.yaml -- the LFRic SOURCE pins for the Stage-2 examples.
 #
 # Stage 1 (the conda environment) needs none of this: it is built entirely from
-# recipes/. This file pins the LFRic *science source* that the Stage-2 examples
+# conda-forge packages (envs/lfric-env.yaml). This file pins the LFRic *science source* that the Stage-2 examples
 # compile -- the conda analogue of the `vendor/` git submodules in the sibling
 # Spack repo (ickc/lfric-env-isambard), which pins the same six repos at the same
 # refs. Keeping the refs identical is what makes the two Stage-2 examples an

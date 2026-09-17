@@ -3,7 +3,7 @@
 # conda Stage-1 environment, the way a scientist does: with Cylc.
 #
 # THIS IS A SCIENCE-SUITE EXAMPLE. The core of this repo is the environment
-# (Stage 1, recipes/). Running a real Rose/Cylc suite is one thing you do *with*
+# (Stage 1, envs/lfric-env.yaml). Running a real Rose/Cylc suite is one thing you do *with*
 # it -- the fullest Stage-2 demonstration there is, because it exercises the whole
 # environment: rose + cylc drive it, psyclone/rose-picker/fab build it, and
 # mpich/XIOS/netCDF/HDF5/yaxt/shumlib run it.

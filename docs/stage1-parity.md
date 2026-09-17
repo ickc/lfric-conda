@@ -7,10 +7,11 @@ mechanism got them there. This document audits that claim against
 
 [spack-repo]: https://github.com/ickc/lfric-env-isambard
 
-**Verdict: yes, with two intended differences** — the Cray/Slingshot MPI stack has
+**Verdict: yes, with three intended differences** — the Cray/Slingshot MPI stack has
 no conda analogue (by design: the conda environment corresponds to the Spack repo's
-portable `spack` variant, not its `cray` variant), and `foxml` is dropped as
-vestigial. Everything else matches, and three of the Spack side's workarounds turn
+portable `spack` variant, not its `cray` variant), `foxml` is dropped as
+vestigial, and the compiler is gcc 15.3 rather than 14.3 because that is the
+generation conda-forge's Fortran packages are built with. Everything else matches, and three of the Spack side's workarounds turn
 out to be unnecessary here.
 
 The claim is not left as an argument: both Stage-2 examples run against this
@@ -33,49 +34,62 @@ Two things, and they are the two halves of this audit:
 
 Every direct dependency of the Spack bundle, and its conda counterpart. Versions
 are the ones each mechanism actually resolved (Spack: the `2026.07.21` build's
-`spack.lock`; conda: a solve of `envs/lfric-env.yaml`).
+`spack.lock`; conda: a September 2026 solve of `envs/lfric-env.yaml` on
+`linux-aarch64`, every package from conda-forge).
 
 | Spack bundle spec | Spack got | conda spec | conda got | note |
 |---|---|---|---|---|
-| `mpi` (provider) | `cray-mpich@9.1.0` / `mpich@5.0.1` | `mpich` | `mpich 5.0.1` | **the one real difference** — see below |
-| `hdf5+fortran+mpi` | `1.14.3` | `hdf5 * mpi_mpich_*` | `2.1.0` | newer; conda-forge only ships current |
+| `mpi` (provider) | `cray-mpich@9.1.0` / `mpich@5.0.1` | `mpich` | `mpich 5.0.1` | **a real difference** — see below |
+| `hdf5+fortran+mpi` | `1.14.3` | `hdf5 * mpi_mpich_*` | `2.2.0` | newer; conda-forge only ships current |
 | `netcdf-c+mpi~dap` | `4.9.2` | `libnetcdf * mpi_mpich_*` | `4.10.0` | " |
-| `netcdf-fortran` | `4.6.1` | `netcdf-fortran * mpi_mpich_*` | `4.6.3` | " |
-| `yaxt` | `0.11.3` | `yaxt * mpi_mpich_*` | `0.11.5.1` | packaged here; `--with-idxtype=long` as LFRic needs |
-| `xios@2701` | `2701` | `xios 2.2701` | `2.2701` | packaged here |
-| `pfunit+mpi` | `4.19.0` | `pfunit` | `4.19.0` | packaged here (+ `gftl`, `gftl-shared`, `fargparse`) |
-| `shumlib` | `2026.07.2` | `shumlib` | `2026.07.2` | packaged here |
-| `blitz` | `1.0.2` | `blitzpp` | `1.0.2` | packaged here; the name `blitz` is taken on conda-forge |
+| `netcdf-fortran` | `4.6.1` | `netcdf-fortran * mpi_mpich_*` | `4.6.4` | " |
+| `yaxt` | `0.11.3` | `yaxt * mpi_mpich_idxtype_long_*` | `0.12.1` | the `--with-idxtype=long` build LFRic needs, selected by build string |
+| `xios@2701` | `2701` | `xios 2.2701 mpi_mpich_*` | `2.2701` | conda-forge feedstock started here |
+| `pfunit+mpi` | `4.19.0` | `pfunit * mpi_mpich_*` | `4.20.1` | conda-forge feedstock started here (+ `gftl`, `gftl-shared`, `fargparse`) |
+| `shumlib` | `2026.07.2` | `shumlib` | `2026.07.2` | conda-forge feedstock started here |
+| `blitz` | `1.0.2` | `blitzpp` | `1.0.2` | conda-forge feedstock started here; the name `blitz` is taken |
 | `foxml` | `6f60cf1` | *(none)* | — | **dropped** — see below |
 | `gmake` | `4.4.1` | `make` | `4.4.1` | |
 | `pkgconf` | `2.5.1` | `pkg-config` | `0.29.2` | same role; either satisfies LFRic's `pkg-config` calls |
-| `python@3.12+shared` | `3.12.13` | `python 3.12.*` | `3.12.13` | |
-| `py-setuptools@:79` | `79.0.1` | *(unpinned)* | `83.x` | pin is a Spack-build workaround; see below |
+| `python@3.12+shared` | `3.12.13` | `python 3.12.*` | `3.12.14` | |
+| `py-setuptools@:79` | `79.0.1` | *(unpinned)* | `84.x` | pin is a Spack-build workaround; see below |
 | `py-fparser` | `0.2.4` | `fparser` | `0.2.4` | |
 | `py-psyclone@3.3.1` | `3.3.1` | `psyclone 3.3.1` | `3.3.1` | the version LFRic vn3.2 requires |
 | `py-jinja2` | `3.0.3` | `jinja2` | `3.0.3` | |
 | `py-pyyaml` | `6.0.3` | `pyyaml` | `6.0.3` | |
-| `py-rose-picker` | `2026.03.2` | `rose-picker` | `2026.03.2` | packaged here |
+| `py-rose-picker` | `2026.03.2` | `rose-picker` | `2026.07.1` | conda-forge feedstock started here; newer |
 | `py-metomi-rose` | `2.4.2` | `metomi-rose` | `2.7.1` | newer |
-| `py-cylc-flow` | `8.4.2` | `cylc-flow` | `8.6.5` | newer |
+| `py-cylc-flow` | `8.4.2` | `cylc-flow` | `8.6.6` | newer |
 | `py-cylc-rose` | `1.5.1` | `cylc-rose` | `1.7.2` | newer |
 | `py-ansimarkup` | `2.1.0` | `ansimarkup` | `2.1.0` | |
 | `py-colorama` | `0.4.6` | `colorama` | `0.4.6` | |
-| *(compiler)* `gcc@14.3.0` | system external | `gcc`/`gxx`/`gfortran 14.3.*` | `14.3.0` | **same compiler generation** — see below |
+| *(compiler)* `gcc@14.3.0` | system external | `gcc`/`gxx`/`gfortran 15.3.*` | `15.3.0` | **different generation, forced** — see below |
 | *(none)* | — | `sci-fab` | `2.2.0` | extra: LFRic's newer Fab build system |
-| *(none)* | — | `cmake` | `4.4.0` | extra: convenience for building against the env |
+| *(none)* | — | `cmake` | `4.4.3` | extra: convenience for building against the env |
 
-### The compiler is the load-bearing match
+### The compiler: load-bearing, and the one difference forced on us
 
-gfortran can only read `.mod` files written by its own generation. So the single
-most important row above is the last-but-two: both environments are **gcc 14.3**.
-The Spack build reaches that by declaring the system `/usr/bin/gcc-14` as an
-external and pinning `c`/`cxx`/`fortran` to it; the conda environment ships its own
-gcc 14.3 toolchain, which is the stronger position — it does not depend on the host
-having one. `scripts/test-env.sh` checks this directly by compiling `use xios` +
-`use yaxt` with the environment's own `mpif90` (`MODULES_OK`).
+gfortran can only read `.mod` files written by its own module-format generation, so
+every Fortran package in an environment, and the compiler the user builds LFRic
+with, have to agree. The Spack build gets that by declaring the system
+`/usr/bin/gcc-14` as an external and pinning `c`/`cxx`/`fortran` to it.
 
-### MPI: the one real difference
+The conda environment cannot choose freely, because it consumes Fortran modules it
+did not build: conda-forge builds its Fortran stack (`mpich`'s `mpi.mod`,
+`netcdf-fortran`, `yaxt`, `xios`, `shumlib`, ...) with its global
+`fortran_compiler_version`, which is **15** as of September 2026. gfortran 15 writes
+module format version 16, which gfortran 14.3 rejects (`Cannot read module file
+... because it was created by a different version of GNU Fortran`). So the
+environment pins **gcc 15.3**, and will move again whenever conda-forge's pinning
+does. LFRic vn3.2 compiles with it, and the u-dr932 suite runs on it: see the
+checks below.
+
+The environment still ships its own toolchain, which remains the stronger position:
+it does not depend on the host having one. `scripts/test-env.sh` checks the module
+agreement directly by compiling `use xios` + `use yaxt` with the environment's own
+`mpif90` (`MODULES_OK`).
+
+### MPI: the other real difference
 
 The Spack repo has two variants. `cray` uses the system `cray-mpich` over
 Slingshot (`cxi`), which is the only way to get RDMA and multi-node scaling on
@@ -158,8 +172,9 @@ that a Stage-2 comparison isolates the environment. See
 
 | check | where | what it proves |
 |---|---|---|
-| package builds, 4 platforms | `build.yml` | Stage 1 assembles at all |
+| package builds, 4 platforms | the conda-forge feedstocks | every package exists where LFRic runs |
 | `scripts/test-env.sh` | local / on Isambard 3 | `use mpi`, `use netcdf`, `use xios`, `use yaxt` compile with the env's own gfortran |
 | `cylc validate` on every suite | `build.yml` lint job | the ported suites parse and validate |
 | **minimal-compile** | `stage2.yml` | the science target `lfric_atm` compiles and links against the env |
 | **science-suite (u-dr932)** | `stage2.yml` | rose+cylc drive the whole thing and the model **runs**: extract → build → mesh → 6-rank forecast |
+| minimal-compile + u-dr932 at full size | `examples/*/*.sbatch` on Isambard 3 | the same, on the production machine: C48_MG, 24 ranks, 72 timesteps (1 day) |

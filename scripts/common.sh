@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Common environment for the build scripts. SOURCE this file; do not run it.
+# Common environment for the scripts. SOURCE this file; do not run it.
 #
 # Kept deliberately small and side-effect-light (env vars only). Configuration is
 # explicit env vars with clear defaults -- no filesystem probing, no inference.
@@ -13,41 +13,6 @@ else
   REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/.." && pwd)"
 fi
 export REPO_ROOT
-
-# --- Where built packages land ---------------------------------------------
-# LOCAL_CHANNEL is a plain directory channel: rattler-build writes
-# <subdir>/<pkg>.conda into it and it can be passed to any conda client with
-# `-c file://$LOCAL_CHANNEL`. Gitignored; safe to delete and rebuild.
-export LOCAL_CHANNEL="${LFRIC_CONDA_CHANNEL:-$REPO_ROOT/local-channel}"
-
-# --- Recipe locations ------------------------------------------------------
-export RECIPE_DIR="$REPO_ROOT/recipes"
-export VARIANT_CONFIG="$REPO_ROOT/variants/conda_build_config.yaml"
-
-# --- Per-OS variant overlay ------------------------------------------------
-# Platform-specific pins (C/C++ compiler generation + the C standard library)
-# differ between linux (GNU gcc + glibc sysroot) and macOS (clang + macOS
-# deployment target). rattler-build does NOT honour "# [osx]" selectors inside a
-# variant file, but it DOES merge multiple --variant-config files, so we keep the
-# common keys in VARIANT_CONFIG and select the right overlay here by the BUILD
-# host -- which is the native target both in CI (one runner per platform) and
-# locally. See docs/platform-coverage.md.
-case "$(uname -s)" in
-  Linux)  VARIANT_CONFIG_OS="$REPO_ROOT/variants/linux.yaml" ;;
-  Darwin) VARIANT_CONFIG_OS="$REPO_ROOT/variants/osx.yaml" ;;
-  *)      VARIANT_CONFIG_OS="" ;;
-esac
-export VARIANT_CONFIG_OS
-
-# --- Build order -----------------------------------------------------------
-# Dependency order, so build-all.sh can just walk the list. Leaf packages first.
-# Keep this list authoritative: it is the project's roadmap in execution order.
-#   rose-picker blitzpp yaxt xios   -- MVP-1 (lfric_core applications)
-#   shumlib                         -- lfric_apps tier (lfric_atm links -lshum)
-#   gftl gftl-shared fargparse pfunit -- unit tests only (pfunit needs the gftl trio)
-# build-all.sh skips any entry without a recipe yet, so listing the roadmap here
-# is safe before the recipes exist.
-export BUILD_ORDER="rose-picker blitzpp yaxt xios shumlib gftl gftl-shared fargparse pfunit"
 
 info() { echo "INFO: $*"; }
 warn() { echo "WARN: $*" >&2; }

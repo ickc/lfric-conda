@@ -2,29 +2,24 @@
 # is a thin wrapper around a script in scripts/, so anyone without pixi can run
 # the same thing directly. Keep that 1:1 mapping, and keep the docs no-pixi-first.
 #
-# pixi's job is only to provide the build tooling (rattler-build) reproducibly.
+# pixi's job is only to provide the conda client test-env.sh drives (micromamba)
+# reproducibly. Every package the environment itself needs comes from conda-forge.
 [workspace]
 name = "lfric-conda"
-description = "Conda packages for the LFRic Stage-1 environment"
+description = "The LFRic Stage-1 environment, from conda-forge packages"
 channels = ["conda-forge"]
 platforms = ["linux-aarch64", "linux-64", "osx-arm64", "osx-64"]
 
 [dependencies]
-rattler-build = ">=0.70"
+micromamba = ">=2"
 
 [tasks]
-# Build one recipe into the local channel: pixi run build <name>
-build = "bash scripts/build-recipe.sh"
-# Build every recipe, in dependency order.
-build-all = "bash scripts/build-all.sh"
-# Create the Stage-1 environment from envs/ + the local channel and smoke-test it.
+# Create the Stage-1 environment from envs/ and smoke-test it.
 test-env = "bash scripts/test-env.sh"
-# Show what the local channel currently holds.
-channel = "bash scripts/list-channel.sh"
 
 # --- Stage 2 -----------------------------------------------------------------
 # Staging the LFRic source needs only git + python3, which are NOT added to this
-# env on purpose: pixi is here to pin rattler-build, and both are already present
+# env on purpose: pixi is here to pin micromamba, and both are already present
 # anywhere this repo can be cloned. The examples themselves run inside the
 # lfric-env environment (`micromamba run -n lfric-env bash examples/...`), not in
 # pixi -- that is the whole point of them.

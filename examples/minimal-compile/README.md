@@ -15,7 +15,7 @@ no Lmod.**
 
 ```bash
 bash scripts/stage-sources.sh && bash scripts/patch-all.sh   # once: the LFRic source
-micromamba create -n lfric-env -f envs/lfric-env.yaml -c ./local-channel -c conda-forge
+micromamba create -n lfric-env -f envs/lfric-env.yaml
 micromamba run -n lfric-env bash examples/minimal-compile/build.sh
 ```
 

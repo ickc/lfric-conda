@@ -1,18 +1,17 @@
 # MVP-1: the LFRic Stage-1 environment for lfric_core, on linux-aarch64, with
 # MPI from conda-forge.
 #
-# Most of it comes straight from conda-forge. The four packages this project had
-# to supply -- xios, blitzpp, rose-picker and a linux-aarch64 yaxt -- are at the
-# bottom, and until they are on conda-forge they resolve from the local channel
-# (scripts/test-env.sh passes it; see README).
+# Everything comes from conda-forge. The four packages this project had to get
+# there -- xios, blitzpp, rose-picker and a linux-aarch64, 64-bit-Xt_int yaxt --
+# are at the bottom.
 name: lfric-env-mvp1
 channels:
   - conda-forge
 dependencies:
-  # --- toolchain (pinned to match the Spack env's gcc@14.3.0) ---------------
-  - gcc_linux-aarch64 14.3.*
-  - gxx_linux-aarch64 14.3.*
-  - gfortran_linux-aarch64 14.3.*
+  # --- toolchain (gcc 15.3: conda-forge's Fortran module generation) --------
+  - gcc_linux-aarch64 15.3.*
+  - gxx_linux-aarch64 15.3.*
+  - gfortran_linux-aarch64 15.3.*
   # --- MPI + parallel I/O ---------------------------------------------------
   - mpich
   - hdf5 * mpi_mpich_*
@@ -36,9 +35,8 @@ dependencies:
   - cylc-rose
   - ansimarkup
   - colorama
-  # --- packaged by this project (see recipes/) ------------------------------
-  # Not on conda-forge yet, so these come from the local channel for now.
+  # --- LFRic-specific packages (conda-forge feedstocks started here) --------
   - xios 2.2701 mpi_mpich_*
   - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
   - rose-picker            # generates LFRic's Fortran config loaders
-  - yaxt * mpi_mpich_*     # on conda-forge, but not yet built for linux-aarch64
+  - yaxt * mpi_mpich_idxtype_long_*  # 64-bit Xt_int, as LFRic needs
