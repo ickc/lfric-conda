@@ -82,7 +82,7 @@ needs.)
 Grace/aarch64) it currently reports:
 
 ```
-GNU Fortran (conda-forge gcc 14.3.0-19) 14.3.0
+GNU Fortran (conda-forge gcc 15.3.0-5) 15.3.0
 COMPILE_OK
  MPI ranks      :            2
  netCDF version : 4.10.0
