@@ -88,8 +88,11 @@ jobs:
         shell: bash -el {0}
         run: |
           set -euo pipefail
-          build="$(micromamba list -n lfric-env '^yaxt$' --json | python -c "import json,sys; r=json.load(sys.stdin); print(r[0]['build_string'] if r else 'MISSING')")"
-          echo "yaxt build: $build"
+          # Read the installed record directly: `micromamba list --json` changes
+          # shape between micromamba releases, conda-meta/ does not.
+          meta="$(ls "$MAMBA_ROOT_PREFIX"/envs/lfric-env/conda-meta/yaxt-[0-9]*.json)"
+          echo "yaxt record: $(basename "$meta")"
+          build="$(basename "$meta" .json)"
           case "$build" in
             *idxtype_long*) ;;
             *) echo "expected the idxtype_long yaxt build"; exit 1 ;;
