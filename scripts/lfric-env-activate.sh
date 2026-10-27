@@ -179,6 +179,32 @@ _lfric_env_prepend LDFLAGS "-L$CONDA_PREFIX/lib" "-Wl,-rpath=$CONDA_PREFIX/lib"
 # installs into the environment prefix, so that is the root.
 export SHUMLIB_ROOT="$CONDA_PREFIX"
 
+# The unit-test tier, for lfric_core's unit tests (rose-stem's unit_tests tasks).
+# pfunit.mk reads $(PFUNIT)/bin/funitproc and $(PFUNIT)/include/driver.F90, and the
+# tests compile against pFUnit's, fargparse's and gftl-shared's modules and link
+# their static libraries by name. All three packages install into a versioned
+# subdirectory of the prefix (PFUNIT-4.20/, FARGPARSE-1.12/, GFTL_SHARED-1.12/),
+# exactly as they do in the Spack view, so collect each one's include/ (plus
+# gftl-shared's include/v2) and lib/. APPENDED, as the modulefile does, so the
+# prefix's own flags keep precedence.
+_lfric_env_append() {  # <varname> <flags...>
+  local var="$1"; shift
+  local cur="${!var:-}" f
+  for f in "$@"; do
+    case " $cur " in *" $f "*) continue ;; esac
+    cur="${cur:+$cur }$f"
+  done
+  export "$var=$cur"
+}
+for _lfric_d in "$CONDA_PREFIX"/PFUNIT-* "$CONDA_PREFIX"/FARGPARSE-* "$CONDA_PREFIX"/GFTL_SHARED-*; do
+  [ -d "$_lfric_d/include" ] && [ -d "$_lfric_d/lib" ] || continue
+  _lfric_env_append FFLAGS "-I$_lfric_d/include"
+  [ -d "$_lfric_d/include/v2" ] && _lfric_env_append FFLAGS "-I$_lfric_d/include/v2"
+  _lfric_env_append LDFLAGS "-L$_lfric_d/lib"
+  case "$_lfric_d" in */PFUNIT-*) export PFUNIT="$_lfric_d" ;; esac
+done
+unset _lfric_d
+
 # --- 4. Runtime -------------------------------------------------------------
 # HDF5 1.10+ flock()s files it creates; Lustre (and some CI filesystems) reject
 # that, so XIOS's nc_create() of a NetCDF-4 output aborts with "Permission denied"
@@ -196,6 +222,25 @@ _lfric_env_vendor="${LFRIC_VENDOR_DIR:-$_lfric_env_repo/vendor}"
 export APPS_ROOT_DIR="${APPS_ROOT_DIR:-$_lfric_env_vendor/lfric_apps}"
 export CORE_ROOT_DIR="${CORE_ROOT_DIR:-$_lfric_env_vendor/lfric_core}"
 export PHYSICS_ROOT="${PHYSICS_ROOT:-$_lfric_env_vendor/physics}"
+
+# The Rose metadata of the pinned LFRic release (every rose-meta/ in the staged
+# lfric_apps, lfric_core and JULES trees), so `rose app-upgrade` on a suite's app
+# configs finds it. The Spack module ships the same directories as a package; here
+# they come from the staged sources, so this is set only once those are staged.
+# Read from vendor/, NOT from APPS_ROOT_DIR/CORE_ROOT_DIR: it names the release's
+# metadata, whatever source tree a suite is building. And deliberately not
+# ROSE_META_PATH, as in the Spack module: that would put this release's metadata in
+# front of every rose command, including rose-stem validating a newer lfric_apps
+# clone. Opt in with `export ROSE_META_PATH=$LFRIC_ROSE_META_PATH`.
+if [ -d "$_lfric_env_vendor/lfric_apps" ]; then
+  _lfric_meta="$(cd -- "$_lfric_env_vendor" &&
+    find lfric_apps lfric_core physics/jules -type d -name rose-meta -prune 2>/dev/null | sort |
+    sed "s|^|$_lfric_env_vendor/|" | paste -sd: -)"
+  if [ -n "$_lfric_meta" ]; then
+    export LFRIC_ROSE_META_PATH="$_lfric_meta"
+  fi
+  unset _lfric_meta
+fi
 unset _lfric_env_repo _lfric_env_vendor
 
 # PSyclone and the LFRic build write .pyc files into the source tree otherwise.
@@ -204,5 +249,5 @@ export PYTHONDONTWRITEBYTECODE=1
 # Informational marker: which prefix this contract was last applied for. Cheap way
 # for a script (or a person) to check that Stage 1 is active and which env it is.
 export LFRIC_ENV_ACTIVE="$CONDA_PREFIX"
-unset -f _lfric_env_warn _lfric_env_same _lfric_env_prepend
+unset -f _lfric_env_warn _lfric_env_same _lfric_env_prepend _lfric_env_append
 hash -r 2>/dev/null || true

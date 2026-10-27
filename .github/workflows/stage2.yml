@@ -107,6 +107,39 @@ jobs:
           bash scripts/patch-all.sh
           du -sh vendor
 
+      # What the Spack module exports for rose-stem, checked on the contract:
+      # PFUNIT and the unit-test tier on FFLAGS/LDFLAGS (lfric_core tests.mk links
+      # pfunit funit fargparse gftl-shared-v2 by name), the release's rose-meta, the
+      # scripts group's tools, and no PYTHONPATH. After staging, because the
+      # rose-meta comes from the staged trees.
+      - name: Activation contract (unit tests, rose-meta, rose-stem tools)
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          . scripts/lfric-env-activate.sh
+          test -x "$PFUNIT/bin/funitproc"
+          test -f "$PFUNIT/include/driver.F90"
+          work="$(mktemp -d)"
+          printf 'program m\n  use funit\n  use fargparse\n  use gftl2_stringvector\nend program m\n' > "$work/m.f90"
+          # shellcheck disable=SC2086  # FFLAGS is a flag list
+          mpif90 -fsyntax-only $FFLAGS -J "$work" "$work/m.f90"
+          for lib in pfunit funit fargparse gftl-shared-v2; do
+            found=
+            for flag in $LDFLAGS; do
+              case "$flag" in -L*) [ -f "${flag#-L}/lib$lib.a" ] && found="${flag#-L}" ;; esac
+            done
+            [ -n "$found" ] || { echo "lib$lib.a not on LDFLAGS"; exit 1; }
+            echo "lib$lib.a  $found"
+          done
+          echo "$LFRIC_ROSE_META_PATH" | tr ':' '\n' | grep -qx "$PWD/vendor/lfric_apps/rose-meta"
+          echo "$LFRIC_ROSE_META_PATH" | tr ':' '\n' | grep -qx "$PWD/vendor/lfric_core/rose-meta"
+          echo "$LFRIC_ROSE_META_PATH" | tr ':' '\n' | grep -qx "$PWD/vendor/physics/jules/rose-meta"
+          [ -z "${PYTHONPATH:-}" ] || { echo "PYTHONPATH is set: $PYTHONPATH"; exit 1; }
+          stylist --help > /dev/null
+          pytest --version
+          python -c 'import networkx; print("networkx", networkx.__version__)'
+          echo CONTRACT_OK
+
       # --- Stage 2: the example -------------------------------------------
       - name: Compile lfric_atm (minimal-compile)
         if: ${{ inputs.example == 'minimal-compile' }}
