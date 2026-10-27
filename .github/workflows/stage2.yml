@@ -98,6 +98,20 @@ jobs:
             *) echo "expected the idxtype_long yaxt build"; exit 1 ;;
           esac
 
+      # rose-stem's plot_* tasks run on the environment's python3; the Spack
+      # module ships the same stack. netCDF4 must load against the env's MPI
+      # libnetcdf, and cartopy must find its PROJ data.
+      - name: Python analysis stack imports
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          python - <<'EOF'
+          import cartopy.crs as ccrs, dask.array, f90nml, iris, matplotlib, netCDF4, numpy, pandas, scipy, six
+          matplotlib.use("Agg")
+          ccrs.PlateCarree().transform_point(0.0, 0.0, ccrs.Geodetic())
+          print("iris", iris.__version__, "netCDF4", netCDF4.__version__, "libnetcdf", netCDF4.__netcdf4libversion__)
+          EOF
+
       # --- Stage 2: the LFRic source --------------------------------------
       - name: Stage and patch the LFRic source
         shell: bash -el {0}
