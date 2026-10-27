@@ -153,6 +153,8 @@ What the two mechanisms export. Left column is `scripts/lfric-env.lua` (Spack,
 | `PSYCLONE_CONFIG` | set (Spack launcher's shebang python cannot find it) | *(not needed)* | ✅ conda's `psyclone` finds its own config |
 | `APPS_ROOT_DIR`, `CORE_ROOT_DIR` | the repo's vendored trees | the repo's staged `vendor/` | ✅ same role; a suite overrides both |
 | `HDF5_USE_FILE_LOCKING=FALSE` | in the suite activator | in the contract | ✅ same value, one level up |
+| `CYLC_SITE_CONF_PATH`, `ROSE_SITE_CONF_PATH` | the module's Isambard 3 site configs (unless already set) | the same files, after `scripts/install-site.sh isambard3` (unless already set) | ✅ same files and precedence; opt-in per environment, so the packages stay site-neutral. See [site-config.md](site-config.md) |
+| `LFRIC_ENV_MODULE`, `LFRIC_ENV_MODULEPATH`, `mosrs-cache-password` | set / on `PATH` | — | n/a: the module's own reload hooks, and an Isambard 3 helper |
 | `SPACK_ENV`, Cray PE `module load`s | set / loaded | — | n/a: mechanism-specific by definition |
 
 ### PYTHONPATH: set by neither

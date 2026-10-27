@@ -154,6 +154,22 @@ are non-obvious and were only found by compiling:
   `g++`-named one (same gcc, ABI-safe). `FC` needs no equivalent because
   `gfortran --version` always prints "GNU Fortran".
 
+### Site configuration
+
+The environment's packages carry no site configuration (Cylc platforms, Rose site
+config, rose-stem site), because they are the same on every machine. A site's
+files live in [`sites/`](sites/), and one command installs them into an
+environment, so that every later activation picks them up:
+
+```sh
+micromamba create -n lfric-env -f envs/lfric-env.yaml
+micromamba run -n lfric-env scripts/install-site.sh isambard3   # on Isambard 3 only
+```
+
+Elsewhere, skip the second line: the examples above need no site config on one
+node. [`docs/site-config.md`](docs/site-config.md) has the details, and how to add
+a site.
+
 ## Upstreaming
 
 Done. The recipes were developed here, then upstreamed through
