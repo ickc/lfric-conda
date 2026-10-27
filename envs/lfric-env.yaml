@@ -60,9 +60,13 @@ dependencies:
   - pyyaml
   - sympy
   # --- workflow tooling -----------------------------------------------------
-  - metomi-rose
-  - cylc-flow
-  - cylc-rose
+  # Pinned to the versions the Spack bundle pins. Unpinned, conda-forge now
+  # resolves cylc-flow 8.7 / metomi-rose 2.8, which the suites have not been
+  # run against.
+  - metomi-rose 2.7.1
+  - cylc-flow 8.6.6
+  - cylc-rose 1.7.2
+  - cylc-uiserver 1.9.4
   - ansimarkup
   - colorama
   # --- LFRic-specific packages (conda-forge feedstocks started here) --------

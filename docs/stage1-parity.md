@@ -58,9 +58,10 @@ are the ones each mechanism actually resolved (Spack: the `2026.07.21` build's
 | `py-jinja2` | `3.0.3` | `jinja2` | `3.0.3` | |
 | `py-pyyaml` | `6.0.3` | `pyyaml` | `6.0.3` | |
 | `py-rose-picker` | `2026.03.2` | `rose-picker` | `2026.07.1` | conda-forge feedstock started here; newer |
-| `py-metomi-rose` | `2.4.2` | `metomi-rose` | `2.7.1` | newer |
-| `py-cylc-flow` | `8.4.2` | `cylc-flow` | `8.6.6` | newer |
-| `py-cylc-rose` | `1.5.1` | `cylc-rose` | `1.7.2` | newer |
+| `py-metomi-rose@2.7.1` | `2.7.1` | `metomi-rose 2.7.1` | `2.7.1` | pinned to match (conda-forge has 2.8) |
+| `py-cylc-flow@8.6.6` | `8.6.6` | `cylc-flow 8.6.6` | `8.6.6` | pinned to match (conda-forge has 8.7) |
+| `py-cylc-rose@1.7.2` | `1.7.2` | `cylc-rose 1.7.2` | `1.7.2` | pinned to match |
+| `py-cylc-uiserver@1.9.4` | `1.9.4` | `cylc-uiserver 1.9.4` | `1.9.4` | pinned to match |
 | `py-ansimarkup` | `2.1.0` | `ansimarkup` | `2.1.0` | |
 | `py-colorama` | `0.4.6` | `colorama` | `0.4.6` | |
 | *(compiler)* `gcc@14.3.0` | system external | `gcc`/`gxx`/`gfortran 15.3.*` | `15.3.0` | **different generation, forced** — see below |
@@ -162,7 +163,8 @@ rather than a modulefile with an escape hatch for Lmod's static `load()` scan.
 ## 3. What is NOT part of Stage 1 either way
 
 Worth stating, because it is a common confusion: **the LFRic source is not Stage
-1.** Both repos pin the same six MetOffice repos at the same refs (`2026.07.1`) and
+1.** Both repos pin the same six MetOffice repos at the same refs (`2026.07.1`, with
+`lfric_core` at its point tag `2026.07.2`) and
 apply the same patch stack — as git submodules there, as
 [`sources.yaml`](../sources.yaml) + `scripts/stage-sources.sh` here — precisely so
 that a Stage-2 comparison isolates the environment. See
