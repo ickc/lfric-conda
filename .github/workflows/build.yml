@@ -71,6 +71,31 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Install a site into an environment
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          # Every site in sites/ installs, and an activation then points Cylc and
+          # Rose at its files; --remove takes them away again.
+          for site in $(scripts/install-site.sh --list); do
+            echo "::group::$site"
+            micromamba run -n cylc scripts/install-site.sh "$site"
+            micromamba run -n cylc bash -c '
+              set -euo pipefail
+              test "$LFRIC_SITE" = "'"$site"'"
+              if [ -f sites/'"$site"'/flow/global.cylc ]; then
+                test "$CYLC_SITE_CONF_PATH" = "$CONDA_PREFIX/etc/lfric-site"
+                cylc config -i "[platforms]"
+              fi
+              if [ -f sites/'"$site"'/rose.conf ]; then
+                test "$ROSE_SITE_CONF_PATH" = "$CONDA_PREFIX/etc/lfric-site"
+                test "$(rose config rosie-id prefix-default)" = u
+              fi'
+            micromamba run -n cylc scripts/install-site.sh --remove
+            micromamba run -n cylc bash -c 'test -z "${CYLC_SITE_CONF_PATH:-}${ROSE_SITE_CONF_PATH:-}"'
+            echo "::endgroup::"
+          done
+
   # --- Stage 2: use the environment ----------------------------------------
   # These two jobs are the point of the repo: they assemble envs/lfric-env.yaml
   # from conda-forge, and then do real LFRic work with it -- compile the science

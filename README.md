@@ -156,11 +156,19 @@ are non-obvious and were only found by compiling:
 
 ### Site configuration
 
-The environment ships no site configuration (Cylc platforms, Rose site config,
-rose-stem site), because it is the same on every machine. A site adds its own:
-[`docs/site-config.md`](docs/site-config.md) says how, with Isambard 3's files in
-[`examples/site-config/isambard3/`](examples/site-config/isambard3/) as the example.
-Nothing is needed to run the examples above on one node.
+The environment's packages carry no site configuration (Cylc platforms, Rose site
+config, rose-stem site), because they are the same on every machine. A site's
+files live in [`sites/`](sites/), and one command installs them into an
+environment, so that every later activation picks them up:
+
+```sh
+micromamba create -n lfric-env -f envs/lfric-env.yaml
+micromamba run -n lfric-env scripts/install-site.sh isambard3   # on Isambard 3 only
+```
+
+Elsewhere, skip the second line: the examples above need no site config on one
+node. [`docs/site-config.md`](docs/site-config.md) has the details, and how to add
+a site.
 
 ## Upstreaming
 

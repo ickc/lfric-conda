@@ -1,9 +1,8 @@
 #!Jinja2
-# Example Cylc site config: Isambard 3. Same content as the one lfric-env-isambard
-# ships in its module. To use it, point Cylc at the directory ABOVE flow/:
-#     export CYLC_SITE_CONF_PATH=<this repo>/examples/site-config/isambard3
-# Anything in your own ~/.cylc/flow/global.cylc is merged on top and wins.
-# See docs/site-config.md.
+# Cylc site config: Isambard 3. Same content as the one lfric-env-isambard ships
+# in its module. Installed into an environment by `scripts/install-site.sh
+# isambard3`, which sets CYLC_SITE_CONF_PATH on activation. Anything in your own
+# ~/.cylc/flow/global.cylc is merged on top and wins. See docs/site-config.md.
 
 [platforms]
     # The compute nodes, through Slurm. Submit a suite's tasks here with
