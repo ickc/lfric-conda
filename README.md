@@ -154,6 +154,14 @@ are non-obvious and were only found by compiling:
   `g++`-named one (same gcc, ABI-safe). `FC` needs no equivalent because
   `gfortran --version` always prints "GNU Fortran".
 
+### Site configuration
+
+The environment ships no site configuration (Cylc platforms, Rose site config,
+rose-stem site), because it is the same on every machine. A site adds its own:
+[`docs/site-config.md`](docs/site-config.md) says how, with Isambard 3's files in
+[`examples/site-config/isambard3/`](examples/site-config/isambard3/) as the example.
+Nothing is needed to run the examples above on one node.
+
 ## Upstreaming
 
 Done. The recipes were developed here, then upstreamed through
