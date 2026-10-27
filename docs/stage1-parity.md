@@ -63,6 +63,10 @@ are the ones each mechanism actually resolved (Spack: the `2026.07.21` build's
 | `py-cylc-rose@1.7.2` | `1.7.2` | `cylc-rose 1.7.2` | `1.7.2` | pinned to match |
 | `py-cylc-uiserver@1.9.4` | `1.9.4` | `cylc-uiserver 1.9.4` | `1.9.4` | pinned to match |
 | `py-ansimarkup` | `2.1.0` | `ansimarkup` | `2.1.0` | |
+| `py-stylist@0.4.1` | `0.4.1` | `stylist 0.4.1` | `0.4.1` | rose-stem `scripts` group |
+| `py-fortitude@0.9.0` | `0.9.0` | *(none)* | — | **missing**: not on conda-forge (PyPI `fortitude-lint` only); rose-stem's fortitude check cannot run |
+| `py-pytest` | | `pytest` | | rose-stem `scripts` group |
+| `py-networkx~default` | | `networkx` | | rose-stem `scripts` group; conda-forge's has no default extras to drop |
 | `py-colorama` | `0.4.6` | `colorama` | `0.4.6` | |
 | *(compiler)* `gcc@14.3.0` | system external | `gcc`/`gxx`/`gfortran 15.3.*` | `15.3.0` | **different generation, forced** — see below |
 | *(none)* | — | `sci-fab` | `2.2.0` | extra: LFRic's newer Fab build system |
@@ -137,28 +141,27 @@ What the two mechanisms export. Left column is `scripts/lfric-env.lua` (Spack,
 | `FFLAGS` | `-I<view>/include`, prepended | `-I$CONDA_PREFIX/include`, prepended | ✅ |
 | `LDFLAGS` | `-L<view>/lib{,64}` + `-rpath` | `-L$CONDA_PREFIX/lib` + `-rpath` | ✅ (conda has no `lib64` split) |
 | `SHUMLIB_ROOT` | shumlib's own prefix | `$CONDA_PREFIX` | ✅ (conda merges prefixes, so it is the env root) |
+| `PFUNIT`, unit-test `FFLAGS`/`LDFLAGS` | pfunit's `PFUNIT-*` dir; pfunit, fargparse, gftl-shared `include/` (+`v2`) and `lib/` appended | same, globbed from `$CONDA_PREFIX/{PFUNIT,FARGPARSE,GFTL_SHARED}-*` | ✅ the conda packages use the same versioned layout |
+| `LFRIC_ROSE_META_PATH` | the `lfric-rose-meta` package (lfric_apps, lfric_core, JULES) | every `rose-meta/` in the staged `vendor/` trees, once staged | ✅ same directories; here they come from the staged source, not a package. Not `ROSE_META_PATH` on either side |
 | `PATH` | view's `bin` prepended | `conda activate` does it | ✅ |
 | `LD_LIBRARY_PATH`, `LIBRARY_PATH` | view's `lib`, `lib64` prepended | *(not needed)* | ✅ conda packages carry `RPATH`/`$ORIGIN`, and the compiler activation already sets the search paths |
-| `PYTHONPATH` + `CYLC_PYTHONPATH` + `ROSE_PYTHONPATH` | all three set to the view's site-packages | *(not needed)* | ✅ **simpler here** — see below |
+| `PYTHONPATH` + `CYLC_PYTHONPATH` + `ROSE_PYTHONPATH` | none since v2026.10.08 | none | ✅ |
 | `PSYCLONE_CONFIG` | set (Spack launcher's shebang python cannot find it) | *(not needed)* | ✅ conda's `psyclone` finds its own config |
 | `APPS_ROOT_DIR`, `CORE_ROOT_DIR` | the repo's vendored trees | the repo's staged `vendor/` | ✅ same role; a suite overrides both |
 | `HDF5_USE_FILE_LOCKING=FALSE` | in the suite activator | in the contract | ✅ same value, one level up |
 | `SPACK_ENV`, Cray PE `module load`s | set / loaded | — | n/a: mechanism-specific by definition |
 
-### The PYTHONPATH triple that conda does not need
+### PYTHONPATH: set by neither
 
-The Spack modulefile has to put the view's `site-packages` on `PYTHONPATH`, because
-Spack's console scripts shebang a base python whose `sys.path` does not include the
-environment. But **cylc and rose both strip every `PYTHONPATH` entry from
-`sys.path` at start-up** (cylc-flow #5124), which breaks them — so the modulefile
-also mirrors the same paths into `CYLC_PYTHONPATH` and `ROSE_PYTHONPATH`, which
-each tool re-adds before stripping. Three variables to work around one layout.
+Until v2026.10.08 the Spack module put the view's `site-packages` on `PYTHONPATH`,
+and mirrored it into `CYLC_PYTHONPATH` and `ROSE_PYTHONPATH` because cylc and rose
+strip `PYTHONPATH` at start-up (cylc-flow #5124). It no longer does: the view's
+`python3` is a venv that finds its own `site-packages`, so the module sets none of
+the three, and a conda environment can be used alongside it.
 
-A conda environment has a single coherent `python` with its own `site-packages`, so
-none of it is needed: `cylc`, `rose` and `psyclone` are ordinary entry points of the
-environment's own interpreter. This is a place where the conda mechanism is simply
-better, and it is visible in the activation contract being ~40 lines of exports
-rather than a modulefile with an escape hatch for Lmod's static `load()` scan.
+A conda environment never needed them: `cylc`, `rose` and `psyclone` are entry
+points of the environment's own interpreter. Neither side exports `PYTHONPATH` now,
+and CI checks that the contract leaves it unset.
 
 ## 3. What is NOT part of Stage 1 either way
 
