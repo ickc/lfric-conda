@@ -20,7 +20,7 @@ lfric_apps:
 
 lfric_core:
     source: https://github.com/MetOffice/lfric_core.git
-    ref: 2026.07.1   # 5d2a8b11 (core vn3.2)
+    ref: 2026.07.2   # c3fd2d42 (core vn3.2 + one build-performance fix)
 
 casim:
     source: https://github.com/MetOffice/casim.git

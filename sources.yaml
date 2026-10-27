@@ -16,7 +16,10 @@
 # repos are PUBLIC and clone anonymously over HTTPS -- no credentials, which is
 # what lets CI stage them.
 #
-# 2026.07.1 == LFRic Apps vn3.2 / Core vn3.2.
+# 2026.07.1 == LFRic Apps vn3.2 / Core vn3.2. lfric_core is at the point tag
+# 2026.07.2, a single build-performance commit that is still flagged as a release;
+# lfric_apps 2026.07.2 is a snapshot of main, so apps stays at 2026.07.1. The
+# sibling repo's MAINTAINER.md says how to tell the two kinds of point tag apart.
 
 lfric_apps:
     source: https://github.com/MetOffice/lfric_apps.git
@@ -24,7 +27,7 @@ lfric_apps:
 
 lfric_core:
     source: https://github.com/MetOffice/lfric_core.git
-    ref: 2026.07.1   # 5d2a8b11 (core vn3.2)
+    ref: 2026.07.2   # c3fd2d42 (core vn3.2 + one build-performance fix)
 
 casim:
     source: https://github.com/MetOffice/casim.git
