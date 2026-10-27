@@ -66,7 +66,11 @@ dependencies:
   - ansimarkup
   - colorama
   # --- LFRic-specific packages (conda-forge feedstocks started here) --------
-  - xios 2.2701 mpi_mpich_*
+  # Build 3 carries the aarch64 mesh-hash fix (conda-forge/xios-feedstock#4):
+  # builds 0-2 segfault writing W0/W2H UGRID output on linux-aarch64. Pinned by
+  # build string so a solve can never fall back to them; bump it here when the
+  # feedstock rebuilds.
+  - xios 2.2701 mpi_mpich_*_3
   - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js
   - rose-picker            # generates LFRic's Fortran config loaders
   - yaxt * mpi_mpich_idxtype_long_*  # 64-bit Xt_int -- see the header

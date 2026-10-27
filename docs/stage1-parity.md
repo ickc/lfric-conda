@@ -44,7 +44,7 @@ are the ones each mechanism actually resolved (Spack: the `2026.07.21` build's
 | `netcdf-c+mpi~dap` | `4.9.2` | `libnetcdf * mpi_mpich_*` | `4.10.0` | " |
 | `netcdf-fortran` | `4.6.1` | `netcdf-fortran * mpi_mpich_*` | `4.6.4` | " |
 | `yaxt` | `0.11.3` | `yaxt * mpi_mpich_idxtype_long_*` | `0.12.1` | the `--with-idxtype=long` build LFRic needs, selected by build string |
-| `xios@2701` | `2701` | `xios 2.2701 mpi_mpich_*` | `2.2701` | conda-forge feedstock started here |
+| `xios@2701` | `2701` + mesh-hash patch | `xios 2.2701 mpi_mpich_*_3` | `2.2701` build 3 | conda-forge feedstock started here; build 3 carries the same aarch64 mesh-hash patch as the Spack package |
 | `pfunit+mpi` | `4.19.0` | `pfunit * mpi_mpich_*` | `4.20.1` | conda-forge feedstock started here (+ `gftl`, `gftl-shared`, `fargparse`) |
 | `shumlib` | `2026.07.2` | `shumlib` | `2026.07.2` | conda-forge feedstock started here |
 | `blitz` | `1.0.2` | `blitzpp` | `1.0.2` | conda-forge feedstock started here; the name `blitz` is taken |
