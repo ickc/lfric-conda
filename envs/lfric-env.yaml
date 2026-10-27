@@ -76,6 +76,20 @@ dependencies:
   - stylist 0.4.1
   - pytest
   - networkx
+  # --- Python analysis stack (rose-stem's plot_* tasks) ---------------------
+  # What the Spack module's python3 carries since v2026.10.08. netcdf4 must be
+  # the MPI build, like the rest of the netCDF/HDF5 stack. mule, um_packing and
+  # um_utils are not on conda-forge yet; see docs/stage1-parity.md.
+  - scitools-iris 3.16.*
+  - cartopy
+  - matplotlib-base
+  - numpy
+  - scipy
+  - pandas
+  - six
+  - netcdf4 * mpi_mpich_*
+  - f90nml
+  - dask-core
   # --- LFRic-specific packages (conda-forge feedstocks started here) --------
   - xios 2.2701 mpi_mpich_*
   - blitzpp                # XIOS's array library; `blitz` is taken by Blitz.js

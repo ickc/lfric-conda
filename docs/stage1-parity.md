@@ -68,6 +68,10 @@ are the ones each mechanism actually resolved (Spack: the `2026.07.21` build's
 | `py-pytest` | | `pytest` | | rose-stem `scripts` group |
 | `py-networkx~default` | | `networkx` | | rose-stem `scripts` group; conda-forge's has no default extras to drop |
 | `py-colorama` | `0.4.6` | `colorama` | `0.4.6` | |
+| `py-scitools-iris@3.16.1` | `3.16.1` | `scitools-iris 3.16.*` | `3.16.2` | Python analysis stack (rose-stem `plot_*`) |
+| `py-cartopy+plotting`, `py-matplotlib`, `py-numpy`, `py-scipy`, `py-pandas~performance`, `py-six`, `py-f90nml`, `py-dask+array` | | `cartopy`, `matplotlib-base`, `numpy`, `scipy`, `pandas`, `six`, `f90nml`, `dask-core` | | " |
+| `py-netcdf4` | | `netcdf4 * mpi_mpich_*` | `1.7.4` | the MPI build, to share the env's libnetcdf |
+| `py-mule`, `py-um-packing`, `py-um-utils` `@2026.09.1` | `2026.09.1` | *(none)* | — | **missing**: not on conda-forge yet; staged-recipes #31934 (mule) is open. um_packing needs a patch for conda-forge's CMake-built shumlib |
 | *(compiler)* `gcc@14.3.0` | system external | `gcc`/`gxx`/`gfortran 15.3.*` | `15.3.0` | **different generation, forced** — see below |
 | *(none)* | — | `sci-fab` | `2.2.0` | extra: LFRic's newer Fab build system |
 | *(none)* | — | `cmake` | `4.4.3` | extra: convenience for building against the env |
